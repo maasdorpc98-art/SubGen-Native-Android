@@ -66,7 +66,7 @@ class MainActivity:Activity(){
         edit(col,"Session title",p.getString("name","My Hypnosis Session")?:"My Hypnosis Session",single=true){putString("name",it)}
         label(col,"Voice · real Kokoro neural speakers",12,false,muted)
         val voiceItems=KokoroNative.voices.keys.toList()
-        spinner(col,voiceItems,p.getString("voice","SERENA")?:"SERENA"){putString("voice",it)}
+        spinner(col,voiceItems,p.getString("voice","SERENA")?:"SERENA"){p.edit().putString("voice",it).apply()}
         label(col,"ORION / ROWAN / LUNA / SERENA use the installed Kokoro voice table.",11,false,muted)
         slider(col,"Speech speed",65,120,(p.getFloat("speed",.84f)*100).toInt(),"%") {p.edit().putFloat("speed",it/100f).apply()}
         val threads=p.getInt("threads",2)
@@ -169,7 +169,7 @@ class MainActivity:Activity(){
         if(action==RenderService.ACTION_CANCEL)startService(intent) else startForegroundService(intent)
         Toast.makeText(this,"Processing in native Android service",Toast.LENGTH_SHORT).show()
     }catch(t:Throwable){Toast.makeText(this,"Cannot start: ${t.message}",Toast.LENGTH_LONG).show()}}
-    private fun scrollPane():ScrollView{val outer=ScrollView(this).apply{fillViewport=false}
+    private fun scrollPane():ScrollView{val outer=ScrollView(this).apply{isFillViewport=false}
         val inner=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(0,6.dp,0,30.dp)}
         outer.addView(inner);return outer
     }
