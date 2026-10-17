@@ -231,15 +231,34 @@ class RenderService:Service() {
         val path=StateStore.partialFile(this)
         Diagnostics.stage("HYPNOSIS_WAV_ASSEMBLY")
         val assembleStart=SystemClock.elapsedRealtime()
-        val sec=WavIO.assemble(nodes,checkpointFiles,path,binOn=prefs.getBoolean("binaural",false))
+        val outChannels=prefs.getInt("hyp:channels",2).coerceIn(1,2)
+        val requestedRate=prefs.getInt("hyp:sampleRate",24000)
+        require(requestedRate in OutputFormat.rates){"Unsupported output sample rate"}
+        // Binaural separation requires stereo. Keep the stored preference unchanged.
+        val sec=WavIO.assemble(nodes,checkpointFiles,path,
+            binOn=(prefs.getBoolean("binaural",false) && outChannels==2))
         Diagnostics.record("WAV_ASSEMBLY_COMPLETED","",org.json.JSONObject()
             .put("elapsedMs",SystemClock.elapsedRealtime()-assembleStart)
             .put("durationSeconds",sec).put("bytes",path.length()))
         if(cancelled.get()){update("Cancelled before export; speech cache is safe");return}
+        update("Applying output volume, channel layout and sample rate…")
+        Diagnostics.stage("HYPNOSIS_OUTPUT_FORMAT")
+        val finalPath=File(filesDir,"hypnosis-final.wav")
+        val formatStart=SystemClock.elapsedRealtime()
+        val formatted=OutputFormat.convert(path,finalPath,requestedRate,outChannels,
+            volumeDb=prefs.getFloat("hyp:outputDb",0f).toDouble().coerceIn(-30.0,12.0),
+            ceilingDb=prefs.getFloat("hyp:peakDb",-1f).toDouble().coerceIn(-12.0,0.0))
+        Diagnostics.record("WAV_OUTPUT_FORMAT_COMPLETED","",org.json.JSONObject()
+            .put("elapsedMs",SystemClock.elapsedRealtime()-formatStart)
+            .put("sampleRate",formatted.rate).put("channels",formatted.channels)
+            .put("wavBytes",formatted.bytes).put("sourcePeak",formatted.sourcePeak)
+            .put("appliedGainDb",formatted.appliedGainDb))
+        if(cancelled.get()){update("Cancelled before export; speech cache is safe");return}
         update("Saving completed WAV to Downloads/SubGen…")
         val exportStart=SystemClock.elapsedRealtime()
-        val uri=WavIO.saveToDownloads(this,path,name)
-        Diagnostics.record("WAV_EXPORT_COMPLETED","",org.json.JSONObject().put("elapsedMs",SystemClock.elapsedRealtime()-exportStart).put("bytes",path.length()))
+        val uri=WavIO.saveToDownloads(this,finalPath,name)
+        Diagnostics.record("WAV_EXPORT_COMPLETED","",org.json.JSONObject()
+            .put("elapsedMs",SystemClock.elapsedRealtime()-exportStart).put("bytes",finalPath.length()))
         val rtf=if(generatedSamples>0)inferenceMs/1000.0/(generatedSamples/24000.0) else 0.0
         update("SAVED · ${"%.1f".format(sec/60)} min · $generated new / $cacheHits reused · RTF ${"%.2f".format(rtf)} · Downloads/SubGen")
         StateStore.prefs(this).edit().putString("lastFileUri",uri.toString()).apply()
