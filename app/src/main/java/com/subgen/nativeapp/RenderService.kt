@@ -196,6 +196,8 @@ class RenderService:Service() {
             update("Loading Kokoro FP32 with $threads tuned CPU workers…")
         } else update("Cache hit · reusing all $speechCount speech blocks without loading Kokoro")
         var finished=0;var generated=0;var cacheHits=0;var generatedSamples=0L;var inferenceMs=0L
+        val quartileMs=LongArray(4)
+        val quartileSamples=LongArray(4)
         val started=SystemClock.elapsedRealtime()
         val initStarted=SystemClock.elapsedRealtime()
         Diagnostics.stage(if(missing>0)"KOKORO_SYNTHESIS" else "CACHE_ONLY_ASSEMBLY",
@@ -206,7 +208,7 @@ class RenderService:Service() {
                 if(cancelled.get()){update("Stopped after $finished / $speechCount blocks. Saved blocks retained.");return}
                 if(n !is ScriptNode.Speech)return@forEachIndexed
                 val clip=checkpointFiles[index] ?: error("Missing checkpoint reference")
-                if(cached[index]){cacheHits++}
+                if(cached[index] || runCatching{val c=WavIO.loadMono(clip);c.rate==24000&&c.frames>0}.getOrDefault(false)){cacheHits++}
                 else {
                     val activeTts=tts?:error("Synthesis engine missing for uncached speech block")
                     val deliverySpeed=when(n.delivery){"SLOW"->.82f;"SOFT"->.94f;"WHISPER"->.90f;else->1f}
@@ -220,7 +222,11 @@ class RenderService:Service() {
                     Diagnostics.record("KOKORO_BLOCK_SUCCESS", "",
                         org.json.JSONObject().put("block",finished+1).put("samples",samples.size)
                             .put("renderMs",SystemClock.elapsedRealtime()-t0))
-                    inferenceMs+=SystemClock.elapsedRealtime()-t0;generatedSamples+=samples.size
+                    val elapsedBlockMs=SystemClock.elapsedRealtime()-t0
+                    inferenceMs+=elapsedBlockMs;generatedSamples+=samples.size
+                    val bucket=(finished*4/speechCount).coerceIn(0,3)
+                    quartileMs[bucket]+=elapsedBlockMs
+                    quartileSamples[bucket]+=samples.size
                     if(cancelled.get()){update("Stopped after $finished completed blocks");return}
                     WavIO.writeMono(clip,samples,sr)
                     generated++
@@ -249,6 +255,10 @@ class RenderService:Service() {
         Diagnostics.record("SPEECH_GENERATION_COMPLETED","",org.json.JSONObject()
             .put("generated",generated).put("reused",cacheHits).put("inferenceMs",inferenceMs)
             .put("workers",threads).put("newSpeechSeconds",generatedSamples/24000.0)
+            .put("quartileRtf",org.json.JSONArray().apply {
+                for(q in 0..3)put(if(quartileSamples[q]>0)
+                    quartileMs[q]/1000.0/(quartileSamples[q]/24000.0) else 0.0)
+            })
             .put("rtf",if(generatedSamples>0)inferenceMs/1000.0/(generatedSamples/24000.0) else 0.0))
         update("Mixing WAV from disk, preserving exact pauses…")
         val path=StateStore.partialFile(this)
