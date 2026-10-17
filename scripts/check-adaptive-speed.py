@@ -21,7 +21,7 @@ assert 'getString(KEY_MODEL' in t and 'Build.FINGERPRINT' in t
 assert 'WorkerPolicy.choose(cores,saved,free,thermal' in t
 assert 'WorkerPolicy.winner(results)' in t
 assert 'KokoroNative(installer,worker).use' in t
-assert 'WorkerPolicy.choose(' in (src/'WorkerPolicy.kt').read_text()
+assert 'fun choose(' in (src/'WorkerPolicy.kt').read_text()
 assert 'val started=SystemClock.elapsedRealtime()' in s
 assert 'generateWithConfigAndCallback(' not in k
 assert 'AudioQuality.examine' in k
