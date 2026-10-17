@@ -260,6 +260,10 @@ class RenderService:Service() {
         Diagnostics.record("SPEECH_GENERATION_COMPLETED","",org.json.JSONObject()
             .put("generated",generated).put("reused",cacheHits).put("inferenceMs",inferenceMs)
             .put("workers",threads).put("newSpeechSeconds",generatedSamples/24000.0)
+            .put("quartileRtf",org.json.JSONArray().apply {
+                for(q in 0..3)put(if(quartileSamples[q]>0)
+                    quartileMs[q]/1000.0/(quartileSamples[q]/24000.0) else 0.0)
+            })
             .put("rtf",if(generatedSamples>0)inferenceMs/1000.0/(generatedSamples/24000.0) else 0.0))
         update("Mixing WAV from disk, preserving exact pauses…")
         val path=StateStore.partialFile(this)
