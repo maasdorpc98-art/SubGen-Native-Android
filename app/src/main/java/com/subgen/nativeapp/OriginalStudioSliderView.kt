@@ -58,7 +58,7 @@ class OriginalStudioSliderView(
         val pad = d(3f)
         val top = d(16f)
         paint.color = labelPaint.color
-        val title = spec.label.uppercase().substringBeforeLast(" 0.0 DB").take(110)
+        val title = cleanLabel(spec.label).uppercase().take(110)
         val room = widthF - d(98f)
         val drawTitle = if (labelPaint.measureText(title) > room) shorten(title, room) else title
         canvas.drawText(drawTitle, pad, top, labelPaint)
@@ -98,10 +98,21 @@ class OriginalStudioSliderView(
         return super.onTouchEvent(event)
     }
     override fun performClick(): Boolean { super.performClick(); return true }
-    private fun formatted(n: Double): String = when {
-        spec.id.contains("vol") || spec.id.contains("output-db") -> String.format(java.util.Locale.US, "%.1f dB", n)
-        spec.id.contains("speed") -> String.format(java.util.Locale.US, "%.2fx", n)
-        else -> if (n == n.toInt().toDouble()) "${n.toInt()}" else String.format(java.util.Locale.US,"%.1f",n)
+    private fun formatted(n: Double): String = when(spec.id) {
+        "ctrl-carrier-hpf" -> if(n<=0)"OFF" else "${intArrayOf(0,20,40,80,100,150,200,300,400,600,800)[n.toInt().coerceIn(0,10)]} Hz"
+        "ctrl-carrier-lpf" -> if(n<=0)"OFF" else "${intArrayOf(0,18000,16000,14000,12000,10000,8000,6000,4000,3000,2000)[n.toInt().coerceIn(0,10)]} Hz"
+        "ctrl-carrier-fade" -> "${n.toInt()}s"
+        "ctrl-binaural-beat", "ctrl-rhythmic-pulse" -> String.format(java.util.Locale.US,"%.1f Hz",n)
+        "ctrl-binaural-center", "ctrl-rhythmic-tone" -> "${n.toInt()} Hz"
+        "ctrl-carrier-width", "ctrl-carrier-8d-motion", "ctrl-carrier-8d-speed", "ctrl-rhythmic-depth" -> "${n.toInt()}%"
+        "ctrl-master-balance-a", "ctrl-master-balance-b" -> if(n==0.0)"Equal · 100%" else "${n.toInt()}"
+        "ctrl-na-layer-speed-1", "ctrl-secondary-speed" -> String.format(java.util.Locale.US,"%.2fx",n)
+        "ctrl-na-layer-volume-1", "ctrl-vol-carrier", "ctrl-vol-noise", "ctrl-vol1", "ctrl-vol-carrier-8d", "ctrl-binaural-volume", "ctrl-rhythmic-volume", "ctrl-master-output-db" -> String.format(java.util.Locale.US, "%.1f dB", n)
+        else -> if(n==n.toInt().toDouble())"${n.toInt()}" else String.format(java.util.Locale.US,"%.2f",n)
+    }
+    private fun cleanLabel(label:String):String {
+        return label.replace(Regex("\\s+(?:−|-)?\\d+(?:\\.\\d+)?(?:\\s?(?:dB|Hz|x|%|s))$",RegexOption.IGNORE_CASE),"")
+           .replace(Regex("\\s+OFF$",RegexOption.IGNORE_CASE),"")
     }
     private fun shorten(str: String, limit: Float): String {
         var text = str

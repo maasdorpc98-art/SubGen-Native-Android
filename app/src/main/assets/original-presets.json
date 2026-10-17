@@ -38,7 +38,15 @@
       "ctrl-secondary-tone": "normal",
       "ctrl-na-layer-speed-1": "1",
       "ctrl-na-layer-volume-1": "0"
-    }
+    },
+    "title": "DEEP INTEGRATION · ENCODE + INSTALL",
+    "description": "Understanding-first flagship: Primary stays clear, natural and dominant; Normal Carrier and restrained 8D sit behind it; aligned 10 Hz Binaural + Smooth AM remain low-level support; 20 minutes favors repeatable sessions. Secondary stays equal when permission is OFF and becomes a natural-speed −6 dB reinforcement only when permission is ON.",
+    "mini": [
+      "Primary 0 dB · 1.00×",
+      "Carrier −18 · 8D −30 dB",
+      "10 Hz quiet support",
+      "20 min · Clarity ON"
+    ]
   },
   {
     "id": "maximum-integration",
@@ -79,7 +87,15 @@
       "ctrl-secondary-tone": "normal",
       "ctrl-na-layer-speed-1": "1",
       "ctrl-na-layer-volume-1": "0"
-    }
+    },
+    "title": "MAXIMUM INTEGRATION · SPEECH FIRST",
+    "description": "The configuration I would use: clear natural-speed Primary speech as the semantic anchor, restrained Carrier + 8D context, low-level aligned 10 Hz Binaural and Smooth AM support, safe peak ceiling, and 20 minutes of repetition. Secondary stays equal when permission is OFF; with permission ON it becomes a −6 dB reinforcement to reduce competing-speech masking.",
+    "mini": [
+      "Primary 0 dB · 1.00×",
+      "Secondary −6 dB if permitted",
+      "10 Hz quiet support",
+      "20 min · Clarity ON"
+    ]
   },
   {
     "id": "audibility-silent-delta",
@@ -120,7 +136,15 @@
       "ctrl-secondary-tone": "normal",
       "ctrl-na-layer-speed-1": "1",
       "ctrl-na-layer-volume-1": "0"
-    }
+    },
+    "title": "SILENT PURE · DELTA",
+    "description": "Deeply masked intact affirmations after equal-volume matching. Delta tone/rhythm bed remains audible while both affirmation files stay present at a very low level rather than being muted.",
+    "mini": [
+      "Aff −48 dB",
+      "2 Hz Binaural",
+      "2 Hz Smooth AM",
+      "Deeply masked"
+    ]
   },
   {
     "id": "audibility-deep-theta",
@@ -161,7 +185,15 @@
       "ctrl-secondary-tone": "normal",
       "ctrl-na-layer-speed-1": "1",
       "ctrl-na-layer-volume-1": "0"
-    }
+    },
+    "title": "DEEP SUBLIMINAL · THETA",
+    "description": "Very quiet affirmations under a theta tone/rhythm bed. Speech remains intact at normal speed but is intended to sit well below the carrier.",
+    "mini": [
+      "Aff −30 dB",
+      "6 Hz Binaural",
+      "6 Hz Smooth AM",
+      "Very quiet"
+    ]
   },
   {
     "id": "audibility-soft-theta",
@@ -202,7 +234,15 @@
       "ctrl-secondary-tone": "normal",
       "ctrl-na-layer-speed-1": "1",
       "ctrl-na-layer-volume-1": "0"
-    }
+    },
+    "title": "SOFT SUBLIMINAL · THETA",
+    "description": "A stronger subliminal level that can approach the edge of perception on some material while retaining a gentle theta tone and rhythm.",
+    "mini": [
+      "Aff −18 dB",
+      "6 Hz Binaural",
+      "6 Hz Smooth AM",
+      "Soft edge"
+    ]
   },
   {
     "id": "audibility-whisper-alpha",
@@ -243,7 +283,15 @@
       "ctrl-secondary-tone": "normal",
       "ctrl-na-layer-speed-1": "1",
       "ctrl-na-layer-volume-1": "0"
-    }
+    },
+    "title": "WHISPER EDGE · ALPHA",
+    "description": "Affirmations are brought close to audible while the carrier and generated tones step back. Designed for a faint, intermittently understandable voice edge.",
+    "mini": [
+      "Aff −9 dB",
+      "10 Hz Binaural",
+      "10 Hz Smooth AM",
+      "Near audible"
+    ]
   },
   {
     "id": "audibility-balanced-alpha",
@@ -284,7 +332,15 @@
       "ctrl-secondary-tone": "normal",
       "ctrl-na-layer-speed-1": "1",
       "ctrl-na-layer-volume-1": "0"
-    }
+    },
+    "title": "AUDIBLE BALANCED · ALPHA",
+    "description": "Clearly present affirmations with the carrier still acting as a background bed. Tone and rhythm are reduced so speech intelligibility becomes the priority.",
+    "mini": [
+      "Aff −3 dB",
+      "Carrier −6 dB",
+      "10 Hz Tone + Rhythm",
+      "Audible"
+    ]
   },
   {
     "id": "audibility-clear-alpha",
@@ -325,7 +381,15 @@
       "ctrl-secondary-tone": "normal",
       "ctrl-na-layer-speed-1": "1",
       "ctrl-na-layer-volume-1": "0"
-    }
+    },
+    "title": "AUDIBLE CLEAR · ALPHA",
+    "description": "Primary and Secondary affirmations are at the neutral matched level while the Carrier and generated tones sit well behind them. This is the clearest speech-first preset in the ladder.",
+    "mini": [
+      "Aff 0 dB",
+      "Carrier −12 dB",
+      "10 Hz Tone + Rhythm",
+      "Clear speech"
+    ]
   },
   {
     "id": "awake-depth",
@@ -366,7 +430,15 @@
       "ctrl-secondary-tone": "normal",
       "ctrl-na-layer-speed-1": "1.1",
       "ctrl-na-layer-volume-1": "0"
-    }
+    },
+    "title": "Max Installation Depth · Awake",
+    "description": "Awake profile with intact speech and a 10 Hz binaural condition. The binaural carrier is centered near 255 Hz, matching common 10 Hz research implementations.",
+    "mini": [
+      "10 Hz Binaural",
+      "1.10× speech",
+      "255 Hz center",
+      "Output unchanged"
+    ]
   },
   {
     "id": "sleep-depth",
@@ -407,7 +479,15 @@
       "ctrl-secondary-tone": "normal",
       "ctrl-na-layer-speed-1": "1",
       "ctrl-na-layer-volume-1": "0"
-    }
+    },
+    "title": "Max Installation Depth · Sleep",
+    "description": "Sleep profile with normal-speed speech, modest affirmation attenuation and a 6 Hz binaural condition centered near 250 Hz.",
+    "mini": [
+      "6 Hz Binaural",
+      "1.00× speech",
+      "250 Hz center",
+      "30 min"
+    ]
   },
   {
     "id": "legacy-sleep",
@@ -448,7 +528,15 @@
       "ctrl-secondary-tone": "normal",
       "ctrl-na-layer-speed-1": "0.9",
       "ctrl-na-layer-volume-1": "0"
-    }
+    },
+    "title": "SLEEP",
+    "description": "Warm, softened Carrier with slightly slowed intact speech. No hidden layers or reverse processing.",
+    "mini": [
+      "0.90× speech",
+      "Aff −6 dB",
+      "Carrier LP 10k",
+      "Sleepy secondary"
+    ]
   },
   {
     "id": "legacy-meditate",
@@ -489,7 +577,15 @@
       "ctrl-secondary-tone": "normal",
       "ctrl-na-layer-speed-1": "0.95",
       "ctrl-na-layer-volume-1": "0"
-    }
+    },
+    "title": "MEDITATE",
+    "description": "Relaxed wide-Carrier profile with near-normal speech and calm Secondary tone when permission is ON.",
+    "mini": [
+      "0.95× speech",
+      "Aff −3 dB",
+      "Carrier 140%",
+      "Calm secondary"
+    ]
   },
   {
     "id": "legacy-passive",
@@ -530,7 +626,15 @@
       "ctrl-secondary-tone": "normal",
       "ctrl-na-layer-speed-1": "1",
       "ctrl-na-layer-volume-1": "0"
-    }
+    },
+    "title": "PASSIVE",
+    "description": "Neutral background-listening profile: normal-speed intact speech, light Carrier cleanup and no generated brainwave tone.",
+    "mini": [
+      "1.00× speech",
+      "Aff −6 dB",
+      "Light cleanup",
+      "No extra layers"
+    ]
   },
   {
     "id": "legacy-theta",
@@ -571,7 +675,15 @@
       "ctrl-secondary-tone": "normal",
       "ctrl-na-layer-speed-1": "0.95",
       "ctrl-na-layer-volume-1": "0"
-    }
+    },
+    "title": "THETA",
+    "description": "6 Hz smooth rhythmic auditory condition. Speech stays intact and close to normal rate; the rhythmic tone remains a separate generator.",
+    "mini": [
+      "6 Hz Smooth AM",
+      "0.95× speech",
+      "Aff −6 dB",
+      "Separate generator"
+    ]
   },
   {
     "id": "legacy-alpha",
@@ -612,7 +724,15 @@
       "ctrl-secondary-tone": "normal",
       "ctrl-na-layer-speed-1": "1",
       "ctrl-na-layer-volume-1": "0"
-    }
+    },
+    "title": "ALPHA",
+    "description": "10 Hz smooth rhythmic auditory condition with normal-speed speech and light Carrier cleanup.",
+    "mini": [
+      "10 Hz Smooth AM",
+      "1.00× speech",
+      "Aff −6 dB",
+      "Separate generator"
+    ]
   },
   {
     "id": "legacy-ghost",
@@ -653,7 +773,15 @@
       "ctrl-secondary-tone": "normal",
       "ctrl-na-layer-speed-1": "1",
       "ctrl-na-layer-volume-1": "0"
-    }
+    },
+    "title": "GHOST",
+    "description": "True concealment profile built only from controls that exist: strongly attenuated affirmations, normal-rate speech and a conservative peak ceiling.",
+    "mini": [
+      "Aff −36 dB",
+      "1.00× speech",
+      "−6 dBFS ceiling",
+      "No boosts"
+    ]
   },
   {
     "id": "legacy-reinforce",
@@ -694,7 +822,15 @@
       "ctrl-secondary-tone": "normal",
       "ctrl-na-layer-speed-1": "1",
       "ctrl-na-layer-volume-1": "0"
-    }
+    },
+    "title": "REINFORCEMENT MATRIX",
+    "description": "40 Hz smooth amplitude-modulated auditory condition. 40 Hz reliably evokes an auditory steady-state response; speech remains a separate intact path.",
+    "mini": [
+      "40 Hz Smooth AM",
+      "1.00× speech",
+      "Aff −3 dB",
+      "Clarity ON"
+    ]
   },
   {
     "id": "legacy-spatial8d",
@@ -735,7 +871,15 @@
       "ctrl-secondary-tone": "normal",
       "ctrl-na-layer-speed-1": "1",
       "ctrl-na-layer-volume-1": "0"
-    }
+    },
+    "title": "8D SPATIAL",
+    "description": "Uses the app's real 8D Carrier branch. Only the Carrier moves; both affirmation files remain stationary and intact.",
+    "mini": [
+      "Carrier 8D 85%",
+      "8D speed 35%",
+      "1.00× speech",
+      "Stationary voices"
+    ]
   },
   {
     "id": "legacy-installation",
@@ -776,7 +920,15 @@
       "ctrl-secondary-tone": "normal",
       "ctrl-na-layer-speed-1": "1",
       "ctrl-na-layer-volume-1": "0"
-    }
+    },
+    "title": "BRAINWAVE INSTALLATION",
+    "description": "Experimental dual-frequency profile using only existing generators: 6 Hz binaural plus 40 Hz Smooth AM. The two components are research-used stimuli; their combination is not assumed to be additive.",
+    "mini": [
+      "6 Hz Binaural",
+      "40 Hz Smooth AM",
+      "1.00× speech",
+      "No hidden engine"
+    ]
   },
   {
     "id": "research-focus",
@@ -817,7 +969,15 @@
       "ctrl-secondary-tone": "normal",
       "ctrl-na-layer-speed-1": "1",
       "ctrl-na-layer-volume-1": "0"
-    }
+    },
+    "title": "RESEARCH FOCUS · ALPHA/GAMMA",
+    "description": "Experimental research-informed profile: clear 1.00× Primary speech, 10 Hz binaural support, low-depth 40 Hz Smooth AM, and a restrained moving Carrier branch. The combination is speculative; each component uses the app's existing signal paths.",
+    "mini": [
+      "10 Hz Binaural",
+      "40 Hz Smooth AM",
+      "Gentle 8D Carrier",
+      "1.00× Primary"
+    ]
   },
   {
     "id": "research-calm",
@@ -858,6 +1018,14 @@
       "ctrl-secondary-tone": "normal",
       "ctrl-na-layer-speed-1": "0.95",
       "ctrl-na-layer-volume-1": "0"
-    }
+    },
+    "title": "RESEARCH CALM · THETA COHERENCE",
+    "description": "Experimental calm/consolidation profile: 6 Hz binaural plus low-depth 6 Hz Smooth AM, softened Carrier, subtle slow 8D Carrier motion, and slightly slowed intact Primary speech. Frequency alignment is a testable speculation, not a proven affirmation effect.",
+    "mini": [
+      "6 Hz Binaural",
+      "6 Hz Smooth AM",
+      "Soft slow 8D",
+      "0.95× Primary"
+    ]
   }
 ]

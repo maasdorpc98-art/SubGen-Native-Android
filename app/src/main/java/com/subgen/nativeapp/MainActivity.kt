@@ -102,7 +102,7 @@ class MainActivity : Activity() {
         val border=when(kind){"primary"->red;"green","aqua"->green;else->Color.rgb(126,62,69)}
         val foreground=when(kind){"primary"->Color.rgb(255,222,224);"green"->Color.rgb(163,255,209);"aqua"->Color.rgb(194,254,242);else->Color.rgb(255,169,177)}
         val v=TextView(this).apply{
-            text=label;textSize=11f;typeface=mono;letterSpacing=.14f;setTextColor(foreground);gravity=Gravity.CENTER
+            text=label;textSize=if(kind=="primary")13f else 11f;typeface=mono;letterSpacing=if(kind=="primary").25f else .12f;setTextColor(foreground);gravity=Gravity.CENTER
             setPadding(d(10),d(13),d(10),d(13));background=cardShape(a,border,10)
             isClickable=true;isFocusable=true;setOnClickListener{callback()}
         }
@@ -132,14 +132,14 @@ class MainActivity : Activity() {
     private fun buildHeader(){
         val header=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER_HORIZONTAL}
         column.addView(header,params())
-        txt(header,"S U B L I M I N A L",27f,coral,true,tracking=.10f,gravity=Gravity.CENTER)
-        txt(header,"S T U D I O",29f,coral,true,tracking=.18f,gravity=Gravity.CENTER)
+        txt(header,"SUBLIMINAL",30f,coral,true,tracking=.30f,gravity=Gravity.CENTER)
+        txt(header,"STUDIO",30f,coral,true,tracking=.38f,gravity=Gravity.CENTER)
         space(header,8)
         txt(header,"A U T O M A T E D   ·   I N T E L L I G E N T",9f,cool,monoFont=true,gravity=Gravity.CENTER)
         txt(header,"P R E C I S I O N - E N G I N E E R E D",9f,cool,monoFont=true,gravity=Gravity.CENTER)
         space(header,11)
         val version=panel(header,Color.rgb(34,19,25),Color.rgb(130,25,35),radius=24,padding=8,margin=0)
-        txt(version,"V 8 . 0 . 3 2   ·   D E E P   I N T E G R A T I O N   ·   E N C O D E   +   I N S T A L L",9f,coral,monoFont=true,gravity=Gravity.CENTER)
+        txt(version,"V8.0.32  ·  DEEP INTEGRATION  ·  ENCODE + INSTALL",9f,coral,monoFont=true,tracking=.12f,gravity=Gravity.CENTER)
         space(header,16)
         val diag=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;pad(this,30,0,30,0)}
         header.addView(diag,params())
@@ -148,7 +148,7 @@ class MainActivity : Activity() {
         }
         space(header,20)
         val save=panel(header,fill=Color.rgb(12,27,37),border=Color.rgb(58,80,94),radius=14,padding=13,margin=0)
-        txt(save,"💾 S A V E   W O R K",14f,Color.rgb(229,251,255),true,tracking=.05f)
+        txt(save,"💾 SAVE WORK",14f,Color.rgb(229,251,255),true,tracking=.12f)
         space(save,5)
         val on=p.getBoolean("saveWork",false)
         val current=txt(save,if(on)"ON · Current settings and source audio are preserved in this app." else "OFF · Current session only. Turn on to preserve settings and source audio after the app closes.",10f,cool,monoFont=true)
@@ -162,8 +162,8 @@ class MainActivity : Activity() {
             val v=TextView(this).apply{text=label;gravity=Gravity.CENTER;textSize=10f;typeface=mono;letterSpacing=.17f;setTextColor(cool);setPadding(d(6),d(14),d(6),d(14))}
             tabs.addView(v,LinearLayout.LayoutParams(0,-2,1f));return v
         }
-        tabStudio=tab("⚙  S T U D I O")
-        tabHypnosis=tab("🧠  H Y P N O S I S\n E N G I N E")
+        tabStudio=tab("⚙  STUDIO")
+        tabHypnosis=tab("🧠 HYPNOSIS ENGINE")
         tabStudio.setOnClickListener{showTab("studio")}
         tabHypnosis.setOnClickListener{showTab("hypnosis")}
         space(header,26)
@@ -206,15 +206,15 @@ class MainActivity : Activity() {
         val presets=section(body,"02 — Presets")
         txt(presets,"DEEP INTEGRATION · ENCODE + INSTALL is the flagship understanding-first preset: natural-speed intelligible Primary speech stays dominant.",10f,cool)
         space(presets,10)
-        val gp=JSONObject()
+        
         for(i in 0 until originalPresets.length()){
             val preset=originalPresets.getJSONObject(i)
-            val raw=preset.getString("name")
-            val label=raw.substringBefore(" The ").substringBefore(" Understanding-first").take(70)
+            val raw=preset.getString("description")
+            val label=preset.getString("title")
             val key=preset.getString("id")
             val c=panel(presets,fill=Color.rgb(26,28,38),border=Color.rgb(90,50,72),radius=10,padding=12,margin=7)
             val title=txt(c,label.uppercase(),11f,Color.rgb(232,224,255),true)
-            val desc=raw.removePrefix(label).trim().take(170)
+            val desc=raw.trim().take(260)
             if(desc.isNotBlank()){space(c,4);txt(c,desc,9f,cool)}
             c.setOnClickListener{applyPreset(key);Toast.makeText(this,"${label} preset applied",Toast.LENGTH_SHORT).show()}
             c.isClickable=true;c.isFocusable=true
@@ -285,14 +285,14 @@ class MainActivity : Activity() {
             slider(c,"ctrl-na-layer-volume-1")
         }
         val render=section(body,"05 — Render Installation")
-        action(render,"▶  G E N E R A T E   P U R E   M A S T E R","primary"){renderStudio(false)}
-        action(render,"▷  P R E V I E W   3 0   S E C"){renderStudio(true)}
+        action(render,"▶ GENERATE PURE MASTER","primary"){renderStudio(false)}
+        action(render,"▷ PREVIEW 30 SEC"){renderStudio(true)}
         action(render,"■ Cancel Active Render"){startAction(RenderService.ACTION_CANCEL)}
         status=txt(render,"Ready to generate · source audio stays on device",10f,cool,monoFont=true)
         val download=section(body,"✓ Subliminal Complete")
         textEntry(download,"Name your completed file", "subName",p.getString("subName","Subliminal Session")?:"Subliminal Session",single=true)
         action(download,"⬇ DOWNLOAD NAMED WAV","green"){openOutput()}
-        action(download,"⬇ DOWNLOAD MANIFEST JSON"){chooseExport(920,"subliminal-manifest.json")}
+        action(download,"⬇ DOWNLOAD MANIFEST JSON"){chooseExport(922,"subliminal-manifest.json")}
     }
     private fun applyPreset(key:String){
         val preset=(0 until originalPresets.length()).map{originalPresets.getJSONObject(it)}.firstOrNull{it.getString("id")==key}?:return
@@ -413,7 +413,7 @@ class MainActivity : Activity() {
         p.edit().putBoolean("subPreview",preview).apply();startAction(RenderService.ACTION_SUBLIMINAL)
     }
     private fun openOutput(){
-        val uri=p.getString("subLastFileUri",null)?:p.getString("lastFileUri",null)
+        val uri=if(activeTab=="studio")p.getString("subLastFileUri",null) else p.getString("lastFileUri",null)
         if(uri==null){Toast.makeText(this,"Generate a WAV first",Toast.LENGTH_LONG).show();return}
         runCatching{startActivity(Intent(Intent.ACTION_VIEW).apply{setDataAndType(Uri.parse(uri),"audio/wav");addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)})}
             .onFailure{Toast.makeText(this,"Saved in Downloads/SubGen",Toast.LENGTH_LONG).show()}
@@ -489,6 +489,15 @@ class MainActivity : Activity() {
             when(requestCode){
                 910->{val script=contentResolver.openInputStream(uri)!!.bufferedReader().use{it.readText()};p.edit().putString("script",script).apply();showTab("hypnosis")}
                 920->{val all=JSONObject(p.getString("namedPresets","{}")?:"{}");contentResolver.openOutputStream(uri,"wt")!!.bufferedWriter().use{it.write(all.toString(2))}}
+                922->{val report=JSONObject().apply{
+                    put("source","Subliminal Studio Native · v8.0.32 controls")
+                    put("status",StateStore.status(this@MainActivity))
+                    val sources=JSONObject();for(k in listOf("carrierStandard","affirmNormal","affirmFrequency"))sources.put(k,p.getString(k,"")?.let{path->File(path).name}?:"")
+                    put("sources",sources)
+                    val control=JSONObject();for(slider in OriginalStudioControlSpec.sliders)control.put(slider.id,p.getFloat("slider:${slider.id}",slider.initial.toFloat()).toDouble())
+                    put("sliders",control)
+                    put("preset",p.getString("presetLabel","Factory defaults"))
+                };contentResolver.openOutputStream(uri,"wt")!!.bufferedWriter().use{it.write(report.toString(2))}}
                 921->{val json=contentResolver.openInputStream(uri)!!.bufferedReader().use{JSONObject(it.readText())};p.edit().putString("namedPresets",json.toString()).apply()}
                 else->{val key=imported[requestCode]?:return
                     val dest=File(filesDir,"source-$key.wav");val temp=File(filesDir,"source-$key.tmp")

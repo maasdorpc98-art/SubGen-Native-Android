@@ -86,8 +86,10 @@ class RenderService:Service() {
         val hpf=hpfArray[level("ctrl-carrier-hpf",0f).toInt().coerceIn(0,10)]
         val lpf=lpfArray[level("ctrl-carrier-lpf",0f).toInt().coerceIn(0,10)]
         val settings=NativeSubliminal.Settings(
-            carrierA=path("carrierStandard"),carrierB=path("carrierStandard"),
-            affirmationA=path("affirmNormal"),affirmationB=path("affirmFrequency"),
+            carrierA=path("carrierStandard")?.let{NativeInputDecoder.prepare(it,::update){cancelled.get()}},
+            carrierB=path("carrierStandard")?.let{NativeInputDecoder.prepare(it,::update){cancelled.get()}},
+            affirmationA=path("affirmNormal")?.let{NativeInputDecoder.prepare(it,::update){cancelled.get()}},
+            affirmationB=path("affirmFrequency")?.let{NativeInputDecoder.prepare(it,::update){cancelled.get()}},
             durationSeconds=duration,rate=rate,
             carrierDb=level("ctrl-vol-carrier",0f),carrier8dDb=level("ctrl-vol-carrier-8d",-60f),
             primaryDb=level("ctrl-vol1",0f),secondaryDb=level("ctrl-vol-noise",0f),
