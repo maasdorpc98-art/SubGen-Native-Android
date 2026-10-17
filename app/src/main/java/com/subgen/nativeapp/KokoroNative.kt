@@ -9,6 +9,7 @@ import com.k2fsa.sherpa.onnx.GenerationConfig
 /** No WebView, no JS, no cloud inference. The JNI runtime and ONNX model must be installed. */
 class KokoroNative(installer:ModelInstaller,threads:Int):AutoCloseable {
     private val engine:OfflineTts
+    private var generations=0
     init {
         check(installer.present()){"Install the offline Kokoro model before rendering"}
         val dir=installer.directory
@@ -40,7 +41,8 @@ class KokoroNative(installer:ModelInstaller,threads:Int):AutoCloseable {
         require(text.length in 1..180){"Speech block outside stable 180-character synthesis limit"}
         require(speaker in 0 until engine.numSpeakers()){"Requested speaker is not present in installed Kokoro model"}
         Diagnostics.beforeNative("KOKORO_GENERATE",org.json.JSONObject().put("characters",text.length)
-            .put("speaker",speaker).put("speed",speed.toDouble()))
+            .put("speaker",speaker).put("speed",speed.toDouble()).put("sequence",generations+1),
+            durable=(generations++%16==0))
         // IMPORTANT: no callback crosses the C++ -> JVM JNI boundary.
         val generated=engine.generateWithConfig(
             text=text,
