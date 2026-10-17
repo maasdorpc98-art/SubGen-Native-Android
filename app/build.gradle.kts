@@ -4,11 +4,11 @@ android {
     namespace = "com.subgen.nativeapp"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.subgen.nativeapp.original"
+        applicationId = "com.subgen.nativeapp.original.diag"
         minSdk = 29
         targetSdk = 34
         versionCode = 1
-        versionName = "3.0-original-ui-test"
+        versionName = "3.0.1-diagnostics-test"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     buildTypes {
