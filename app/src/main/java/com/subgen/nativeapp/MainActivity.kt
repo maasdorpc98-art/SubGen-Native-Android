@@ -465,7 +465,7 @@ class MainActivity : Activity() {
         })
         val pack=if(ModelInstaller(this).present())"OFFLINE VOICES INSTALLED" else "INSTALL OFFLINE VOICE PACK"
         action(session,pack,"aqua"){startAction(RenderService.ACTION_INSTALL)}
-        action(session,"BENCHMARK · AUTO-SELECT 2 OR 4 THREADS"){startAction(RenderService.ACTION_BENCHMARK)}
+        action(session,"BENCHMARK · FIND FASTEST CPU SETTING"){startAction(RenderService.ACTION_BENCHMARK)}
         val editor=hypSection("02 — HYPNOSIS SCRIPT")
         txt(editor,"[SECTION] · [PAUSE: 5] · [SLOW] · [SOFT] · [WHISPER] · [NORMAL]",10f,cool,monoFont=true)
         val field=textEntry(editor,"Write or paste your hypnosis script","script",p.getString("script","")?:"")
