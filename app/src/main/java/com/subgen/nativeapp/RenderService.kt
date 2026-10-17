@@ -58,7 +58,7 @@ class RenderService:Service() {
         val installer=ModelInstaller(this);installer.install(::update)
         update("Generating $voice preview in native engine…")
         KokoroNative(installer,InferenceTuner.threads(this)).use {tts->
-            val (data,rate)=tts.synthesize("Take a slow, comfortable breath. You can relax now.",sid,p.getFloat("speed",.84f)){cancelled.get()}
+            val (data,rate)=tts.synthesize("Take a slow, comfortable breath. You can relax now.",sid,p.getFloat("speed",VoiceSpeed.DEFAULT)){cancelled.get()}
             WavIO.writeMono(java.io.File(filesDir,"native-voice-preview.wav"),data,rate)
         }
         update("VOICE PREVIEW READY · tap PLAY PREVIEW")
@@ -68,7 +68,7 @@ class RenderService:Service() {
         val p=StateStore.prefs(this);val installer=ModelInstaller(this);installer.install(::update)
         val sid=KokoroNative.voices[p.getString("voice","SERENA")]?:3
         val phrase="Take a slow breath. Let each breath feel calmer and easier as your shoulders relax."
-        val speed=p.getFloat("speed",.84f)
+        val speed=p.getFloat("speed",VoiceSpeed.DEFAULT)
         val results=mutableListOf<Pair<Int,Double>>()
         for(threads in listOf(1,2,4).filter{it<=Runtime.getRuntime().availableProcessors()}){
             if(cancelled.get())return
@@ -156,7 +156,7 @@ class RenderService:Service() {
         StateStore.active(this,true)
         val voice=prefs.getString("voice","SERENA")?:"SERENA"
         val sid=KokoroNative.voices[voice]?:3
-        val speed=prefs.getFloat("speed",0.84f).coerceIn(.65f,1.2f)
+        val speed=prefs.getFloat("speed",VoiceSpeed.DEFAULT).coerceIn(.65f,1.2f)
         // Native throughput is independent from speech speed and output WAV quality.
         var threads=InferenceTuner.threads(this)
         Diagnostics.record("SPEED_ENGINE","FP32 + adaptive inference workers + cache-first pipeline")
