@@ -26,12 +26,13 @@ class RenderService:Service() {
     override fun onCreate(){super.onCreate();createChannel()}
     override fun onStartCommand(intent:Intent?,flags:Int,startId:Int):Int {
         // Android must not automatically replay a failed native inference after process death.
-        if(intent?.action == null || intent.action !in setOf(ACTION_RENDER,ACTION_INSTALL,ACTION_BENCHMARK,ACTION_PREVIEW,ACTION_SUBLIMINAL,ACTION_CANCEL)) {
+        val request=intent?.action
+        if(request == null || request !in setOf(ACTION_RENDER,ACTION_INSTALL,ACTION_BENCHMARK,ACTION_PREVIEW,ACTION_SUBLIMINAL,ACTION_CANCEL)) {
             Diagnostics.record("IGNORED_SERVICE_RESTART", "No explicit valid user-initiated action")
             stopSelfResult(startId)
             return START_NOT_STICKY
         }
-        if(intent.action==ACTION_CANCEL){if(busy.get()){cancelled.set(true);update("Stopping at safe checkpoint…")}else stopSelf();return START_NOT_STICKY}
+        if(request==ACTION_CANCEL){if(busy.get()){cancelled.set(true);update("Stopping at safe checkpoint…")}else stopSelf();return START_NOT_STICKY}
         if(busy.compareAndSet(false,true)){
             cancelled.set(false)
             // Foreground promotion happens before doing any work, including downloading model assets.
