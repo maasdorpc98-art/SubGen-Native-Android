@@ -43,18 +43,8 @@ object InferenceTuner {
         val saved=calibrated(context)
         val free=availableMiB(context)
         val thermal=heat(context)
-        // Four threads is a starting hypothesis, not an assertion of universal speed.
-        // Actual phone benchmarks override this and can select one, two or three.
-        var result=(if(saved>0)saved else when {
-            cores>=8 -> 4
-            cores>=6 -> 3
-            cores>=4 -> 2
-            else -> 1
-        }).coerceIn(1,minOf(cores,4))
-        if(free in 0..449) result=1
-        else if(free in 450..1099) result=minOf(result,2)
-        if(thermal>=PowerManager.THERMAL_STATUS_SEVERE) result=1
-        else if(thermal>=PowerManager.THERMAL_STATUS_MODERATE) result=minOf(result,2)
+        val result=WorkerPolicy.choose(cores,saved,free,thermal,
+            PowerManager.THERMAL_STATUS_MODERATE,PowerManager.THERMAL_STATUS_SEVERE)
         Diagnostics.record("INFERENCE_THREAD_POLICY","FP32 adaptive policy",JSONObject()
             .put("workers",result).put("availableCores",cores).put("calibrated",saved)
             .put("thermalStatus",thermal).put("freeMemoryMiB",free))
@@ -106,10 +96,7 @@ object InferenceTuner {
             }
         }
         if(results.size<2)return threads(context)
-        val best=results.minByOrNull{it.second} ?: return threads(context)
-        // Avoid changing engines for noise-sized improvements.
-        val two=results.firstOrNull{it.first==2}
-        val selected=if(two!=null && two.second<=best.second*1.07)two else best
+        val selected=WorkerPolicy.winner(results) ?: return threads(context)
         StateStore.prefs(context).edit()
             .putInt(KEY_THREADS,selected.first).putString(KEY_PROFILE,Build.FINGERPRINT)
             .putString(KEY_MODEL,MODEL_SIGNATURE).putFloat(KEY_RTF,selected.second.toFloat()).apply()
