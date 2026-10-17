@@ -72,7 +72,7 @@ class MainActivity : Activity() {
     private fun pad(parent:LinearLayout,l:Int=14,t:Int=14,r:Int=14,b:Int=14){parent.setPadding(d(l),d(t),d(r),d(b))}
     private fun txt(parent:LinearLayout,value:String,size:Float=11f,color:Int=muted,bold:Boolean=false,monoFont:Boolean=false,tracking:Float=0f,gravity:Int=Gravity.START):TextView {
         val v=TextView(this).apply{
-            text=value;textSize=size;setTextColor(color);typeface=if(monoFont)mono else if(bold)display else Typeface.create("sans-serif",Typeface.NORMAL)
+            text=value;textSize=size;setTextColor(color);typeface=if(monoFont)mono else if(bold)this@MainActivity.display else Typeface.create("sans-serif",Typeface.NORMAL)
             letterSpacing=tracking;this.gravity=gravity;includeFontPadding=false
             setLineSpacing(d(2).toFloat(),1.05f)
         };parent.addView(v,params());return v
@@ -391,7 +391,7 @@ class MainActivity : Activity() {
         parent.addView(edit,params(if(single)d(48) else d(255)).apply{bottomMargin=d(8)})
         edit.addTextChangedListener(object:TextWatcher{
             override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){}
-            override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){p.edit().putString(key,s?.toString()? : "").apply()}
+            override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){p.edit().putString(key,s?.toString() ?: "").apply()}
             override fun afterTextChanged(s:Editable?){}
         });return edit
     }
