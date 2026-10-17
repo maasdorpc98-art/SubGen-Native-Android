@@ -63,7 +63,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: SubGen-Native-v3.0.2-Stability-Source
-          path: ${{ runner.temp }}/SubGen-Native-v3.0.1-Diagnostic-Source.zip
+          path: ${{ runner.temp }}/SubGen-Native-v3.0.2-Stability-Source.zip
           if-no-files-found: error
       - name: Publish installable diagnostic APK pre-release
         if: github.event_name == 'push' && github.ref == 'refs/heads/subgen-v3.0.2-stability'
