@@ -209,6 +209,11 @@ class RenderService:Service() {
                 if(cached[index] || runCatching{val c=WavIO.loadMono(clip);c.rate==24000&&c.frames>0}.getOrDefault(false)){cacheHits++}
                 else {
                     val activeTts=tts?:error("Synthesis engine missing for uncached speech block")
+                    if(generated>=36 && generated%18==0){
+                        val rtf=if(generatedSamples>0) inferenceMs/1000.0/(generatedSamples/24000.0) else 0.0
+                        activeTts.recheck(sid,speed,generated,rtf,InferenceTuner.heat(this),InferenceTuner.availableMiB(this))
+                        threads=activeTts.workers
+                    }
                     val deliverySpeed=when(n.delivery){"SLOW"->.82f;"SOFT"->.94f;"WHISPER"->.90f;else->1f}
                     if(finished==0 || finished%6==0)update("Generating ${finished+1} / $speechCount · $voice · saved $finished")
                     val t0=SystemClock.elapsedRealtime()
