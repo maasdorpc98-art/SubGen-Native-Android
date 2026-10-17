@@ -4,11 +4,11 @@ android {
     namespace = "com.subgen.nativeapp"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.subgen.nativeapp.original.adaptivespeed"
+        applicationId = "com.subgen.nativeapp.stable"
         minSdk = 29
         targetSdk = 34
-        versionCode = 7
-        versionName = "3.0.7-adaptive-speed-test"
+        versionCode = 8
+        versionName = "3.0.8-voice-speed-stable-baseline"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     buildTypes {
