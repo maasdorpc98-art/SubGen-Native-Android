@@ -57,7 +57,7 @@ class RenderService:Service() {
         val sid=KokoroNative.voices[voice]?:3
         val installer=ModelInstaller(this);installer.install(::update)
         update("Generating $voice preview in native engine…")
-        KokoroNative(installer,p.getInt("threads",2)).use {tts->
+        KokoroNative(installer,1).use {tts->
             val (data,rate)=tts.synthesize("Take a slow, comfortable breath. You can relax now.",sid,p.getFloat("speed",.84f)){cancelled.get()}
             WavIO.writeMono(java.io.File(filesDir,"native-voice-preview.wav"),data,rate)
         }
@@ -70,7 +70,7 @@ class RenderService:Service() {
         val phrase="Take a slow breath. Let each breath feel calmer and easier as your shoulders relax."
         val speed=p.getFloat("speed",.84f)
         val results=mutableListOf<Pair<Int,Double>>()
-        for(threads in listOf(2,4)){
+        for(threads in listOf(1)){
             if(cancelled.get())return
             update("Native performance test · $threads inference threads…")
             KokoroNative(installer,threads).use {tts->
@@ -154,7 +154,7 @@ class RenderService:Service() {
         val speed=prefs.getFloat("speed",0.84f).coerceIn(.65f,1.2f)
         // Stability mode: limit inference parallelism. User's selected setting remains stored for later.
         val threads=1
-        Diagnostics.record("STABILITY_MODE", "Single CPU thread and bounded speech blocks")
+        Diagnostics.record("STABILITY_MODE", "FP32 neural model, single CPU thread and validated speech blocks")
         val name=prefs.getString("name","Hypnosis Session")?:"Hypnosis Session"
         val nodes=ScriptParser.parse(script,maxSpeechChars=160)
         val speechCount=nodes.count{it is ScriptNode.Speech}
@@ -172,7 +172,7 @@ class RenderService:Service() {
             nodes.forEachIndexed{index,n->
                 if(cancelled.get()){update("Stopped after $finished / $speechCount blocks. Saved blocks retained.");return}
                 if(n !is ScriptNode.Speech)return@forEachIndexed
-                val key=StateStore.hash("native-kokoro-v1_0-int8|${sid}|${speed}|${n.delivery}|${n.text}")
+                val key=StateStore.hash("native-kokoro-v1_0-fp32-validated|${sid}|${speed}|${n.delivery}|${n.text}")
                 val clip=File(StateStore.blocksDir(this),"$key.wav")
                 val existing=runCatching{WavIO.loadMono(clip)}.getOrNull()
                 if(existing!=null){cacheHits++}
