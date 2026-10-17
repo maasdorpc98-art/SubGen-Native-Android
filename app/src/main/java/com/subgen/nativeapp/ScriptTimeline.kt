@@ -26,7 +26,10 @@ object ScriptTimeline {
                 // 145 WPM at 1x is a heuristic; neural PCM remains authoritative.
                 val seconds=count*60.0/(145.0*resolved.speed.toDouble())
                 rows+=Row(at,"SPEECH",String.format(Locale.US,"%s · %.2fx · %+.1f dB · %s",
-                    node.delivery,resolved.speed,resolved.gainDb,node.text.take(88)))
+                    node.delivery,resolved.speed,resolved.gainDb,
+                    (if(node.scriptProfile!=null)"profile="+node.scriptProfile+" · " else "")+
+                    (if(node.explicitPhaseMode)"phase="+(node.acousticPhase?:"GLOBAL") else "legacy phase="+resolved.section)+
+                    " · "+node.text.take(88)))
                 speech+=seconds;at+=seconds
             }
             is ScriptNode.Pause->{
@@ -36,6 +39,8 @@ object ScriptTimeline {
                 silence+=seconds;at+=seconds
             }
             is ScriptNode.DeliveryChange->rows+=Row(at,"DELIVERY",node.mode)
+            is ScriptNode.ProfileChange->rows+=Row(at,"PROFILE",node.name)
+            is ScriptNode.PhaseChange->rows+=Row(at,"ACOUSTIC PHASE",node.name)
             is ScriptNode.Unknown->{invalid++;rows+=Row(at,"ERROR","Invalid production or HYPER planner code: "+node.command.take(90))}
         }}
         return Summary(spoken,pauses,sections,speech,silence,at,words,markers,rows,

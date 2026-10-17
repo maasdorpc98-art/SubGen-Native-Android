@@ -71,16 +71,18 @@ class RenderService:Service() {
         val clips=MutableList<File?>(nodes.size){null}
         val prepared=nodes.mapIndexed { i,node ->
             if(node is ScriptNode.Speech){
-                val settings=VoiceDirection.resolve(node,speed,config)
+                val selected=if(neutral)node.copy(delivery="NORMAL",tempo=null,gainDb=null,
+                    scriptProfile=null,acousticPhase=null,explicitPhaseMode=true) else node
+                val settings=VoiceDirection.resolve(selected,speed,config)
                 require(settings.speed in .6f..1.4f){"Voice preview tempo out of range"}
-                node.copy(gainDb=settings.gainDb)
+                selected.copy(gainDb=settings.gainDb)
             } else node
         }
         KokoroNative(installer,InferenceTuner.threads(this)).use {tts ->
             prepared.forEachIndexed { index,node ->
                 if(cancelled.get())return
                 if(node is ScriptNode.Speech){
-                    val r=VoiceDirection.resolve(nodes[index] as ScriptNode.Speech,speed,config)
+                    val r=VoiceDirection.resolve(node,speed,config)
                     val (data,rate)=tts.synthesize(node.text,sid,r.speed){cancelled.get()}
                     val f=File(cacheDir,"subgen-preview-block-$index.wav")
                     WavIO.writeMono(f,data,rate);clips[index]=f
@@ -212,7 +214,7 @@ class RenderService:Service() {
         nodes.forEachIndexed { index, n ->
             if(n !is ScriptNode.Speech) return@forEachIndexed
             val resolved=VoiceDirection.resolve(rawNodes[index] as ScriptNode.Speech,speed,direction)
-            val cacheSpeed=if(direction.enabled||n.tempo!=null) resolved.speed else speed
+            val cacheSpeed=if(direction.enabled||n.tempo!=null||n.scriptProfile!=null) resolved.speed else speed
             val key=StateStore.hash("native-kokoro-v1_0-fp32-validated|${sid}|${cacheSpeed}|${n.delivery}|${n.text}")
             val clip=File(StateStore.blocksDir(this),"$key.wav")
             val header=runCatching{WavIO.loadMono(clip)}.getOrNull()
