@@ -82,6 +82,18 @@ object OutputFormat {
         val gain=if(peak>0.0) min(requested,cap/peak) else requested
         val appliedDb=20.0*log10(gain.coerceAtLeast(1e-12))
         val tmp=File(target.parentFile,target.name+".partial")
+        // Exact PCM passthrough, without resampling or recoding, when the output
+        // already matches the requested format and gain is unity.
+        if(rate==24000 && channels==2 && abs(gain-1.0)<1e-10) {
+            try {
+                source.inputStream().buffered(131072).use{input->
+                    FileOutputStream(tmp).buffered(131072).use{out->input.copyTo(out,131072)}
+                }
+                if(target.exists())target.delete()
+                check(tmp.renameTo(target)){"Cannot commit passthrough WAV"}
+                return Result(srcFrames/24000.0,target.length(),peak,appliedDb,rate,channels)
+            }catch(t:Throwable){tmp.delete();throw t}
+        }
         try{
             RandomAccessFile(source,"r").use { input ->
                 FileOutputStream(tmp).buffered(131072).use { output ->
