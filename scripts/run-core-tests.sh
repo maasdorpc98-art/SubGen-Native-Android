@@ -24,3 +24,6 @@ java -jar /tmp/subgen-hyper-voice-tests.jar
 
 kotlinc "$K/ScriptParser.kt" "$K/WavIO.kt" scripts/test_voice_pcm.kt tests/stubs/*.kt -include-runtime -d /tmp/subgen-hyper-voice-pcm.jar
 java -jar /tmp/subgen-hyper-voice-pcm.jar
+
+kotlinc "$K/ScriptParser.kt" "$K/VoiceDirection.kt" "$K/ScriptTimeline.kt" "$K/VoiceSpeed.kt" scripts/test_script_acoustic_contract.kt -include-runtime -d /tmp/subgen-script-acoustic-contract.jar
+java -jar /tmp/subgen-script-acoustic-contract.jar

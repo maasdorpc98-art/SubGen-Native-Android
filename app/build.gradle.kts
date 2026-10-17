@@ -7,8 +7,8 @@ android {
         applicationId = "com.subgen.nativeapp.stable"
         minSdk = 29
         targetSdk = 34
-        versionCode = 10
-        versionName = "3.1.0-hyper-voice-foundations"
+        versionCode = 11
+        versionName = "3.1.1-script-acoustic-contract"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     buildTypes {

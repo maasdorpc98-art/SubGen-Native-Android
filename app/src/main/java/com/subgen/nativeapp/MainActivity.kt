@@ -490,7 +490,7 @@ class MainActivity : Activity() {
         action(session,pack,"aqua"){startAction(RenderService.ACTION_INSTALL)}
         action(session,"BENCHMARK · FIND FASTEST CPU SETTING"){startAction(RenderService.ACTION_BENCHMARK)}
         val directionPanel=hypSection("VOICE DIRECTION · OPTIONAL")
-        txt(directionPanel,"HYPER personality is a WRITING LABEL. Kokoro supports speed; section softness is gain/rate approximation, not neural emotion or true whisper.",10f,cool)
+        txt(directionPanel,"HYPER personality is a WRITING LABEL. Kokoro supports speed; section softness is gain/rate approximation, not neural emotion or true whisper. A script [profile ...] overrides this UI default; [phase ...] selects the acoustic category independently of [SECTION: NAME].",10f,cool)
         val directions=CheckBox(this).apply {
             text="ENABLE VOICE DIRECTION FOR THIS PROJECT"
             setTextColor(bright);isChecked=p.getBoolean("dir:enabled",false)
@@ -582,7 +582,7 @@ class MainActivity : Activity() {
         }
         refreshRule()
         val editor=hypSection("02 — HYPNOSIS SCRIPT")
-        txt(editor,"[SECTION: NAME] · [pause 2] · [SOFT] · [SLOW] · [WHISPER≈] · [NORMAL] · [tempo 0.90] · [volume -2dB]",10f,cool,monoFont=true)
+        txt(editor,"[profile MASTER_HYPNOTIST] · [profile reset] · [phase DEEPENER] · [phase reset] · [SECTION: NAME] · [pause 2] · [SOFT] · [SLOW] · [WHISPER≈] · [NORMAL] · [tempo 0.90] · [volume -2dB]",10f,cool,monoFont=true)
         fun pauseSetting(key:String,title:String,default:Float){
             val value=txt(editor,title,10f,cool,monoFont=true)
             val bar=SeekBar(this).apply{max=120;progress=(p.getFloat(key,default)*2).roundToInt().coerceIn(0,120)

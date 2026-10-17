@@ -12,6 +12,9 @@ object VoiceDirection {
                         val section:String,val actualTempoFactor:Double)
     val profiles=listOf("GENTLE GUIDE","CONFIDENT AUTHORITY","MASTER HYPNOTIST",
                         "COMMANDING / DRAMATIC","INTELLIGENT INSTRUCTOR")
+    // Script names are intentionally canonical, not free-text personality guesses.
+    val profileCodes=ScriptParser.PROFILE_CODES
+    fun profileFromCode(value:String):String?=profileCodes[value.trim().uppercase()]
     val sections=listOf("ARRIVAL","INDUCTION","DEEPENER","FRACTIONATION",
                         "SUGGESTIONS","REINFORCEMENT","INTEGRATION","WAKE","SLEEP")
     fun normalizeSection(section:String):String{
@@ -43,20 +46,30 @@ object VoiceDirection {
      */
     fun resolve(node:ScriptNode.Speech,globalSpeed:Float,config:Config=Config()):Resolved{
         require(globalSpeed.isFinite()&&globalSpeed in .65f..1.2f)
-        val section=normalizeSection(node.section)
-        val rule=if(config.enabled)config.sectionRules[section]?:preset(config.profile,section) else SectionRule()
+        // New script syntax opts into independent acoustic phases. Existing
+        // scripts without [profile]/[phase] preserve v3.1.0 legacy mapping.
+        val section=if(node.explicitPhaseMode) node.acousticPhase.orEmpty()
+            else normalizeSection(node.legacyPhase.ifEmpty { node.section })
+        val active=node.scriptProfile!=null||config.enabled
+        val selected=node.scriptProfile?:config.profile
+        // Script-selected acoustic presets ignore UI overrides for other profiles.
+        val rule=when {
+            node.scriptProfile!=null->preset(selected,section)
+            config.enabled->config.sectionRules[section]?:preset(selected,section)
+            else->SectionRule()
+        }
         val legacy=when(node.delivery){"SLOW"->.82;"SOFT"->.94;"WHISPER"->.90;else->1.0}
-        val factor=node.tempo ?: if(node.delivery!="NORMAL")legacy else if(config.enabled)rule.tempo else 1.0
+        val factor=node.tempo ?: if(node.delivery!="NORMAL")legacy else if(active)rule.tempo else 1.0
         val gain=(if(config.enabled)config.globalGainDb else 0.0)+
-            (node.gainDb ?: if(config.enabled)rule.gainDb else 0.0)
+            (node.gainDb ?: if(active)rule.gainDb else 0.0)
         require(factor.isFinite()&&factor in .5..1.5){"Effective tempo out of range"}
         require(gain.isFinite()&&gain in -30.0..6.0){"Effective gain exceeds safe profile range"}
         val rawSpeed=(globalSpeed.toDouble()*factor).toFloat()
         // Existing Kokoro clamped slow legacy delivery to 0.60; preserve it.
         // New opt-in settings must be in range and never silently clamp.
-        if(node.tempo!=null||config.enabled)require(rawSpeed in .6f..1.4f){
+        if(node.tempo!=null||active)require(rawSpeed in .6f..1.4f){
             "Effective tempo exceeds native Kokoro 0.60–1.40. Adjust tempo or global speed."
         }
-        return Resolved(rawSpeed.coerceIn(.6f,1.4f),gain,node.delivery,node.section,factor)
+        return Resolved(rawSpeed.coerceIn(.6f,1.4f),gain,node.delivery,section,factor)
     }
 }
