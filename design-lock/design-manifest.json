@@ -1,0 +1,485 @@
+{
+  "designSource": {
+    "filename": "Subliminal-Hypnosis-v1.1-Background-Speed-Test (1).apk",
+    "apkSHA256": "252e1a910687ab96cf80a7416afbd49dd95ed97cf528051f06dc4c57d9e05404",
+    "htmlSHA256": "f0881b0bb738ce862ff64cf512e182ae07cc03c9002de81b8d4e2a0097cc989a",
+    "htmlTitle": "SUBLIMINAL STUDIO v8.0.32 — Deep Integration · Encode + Install"
+  },
+  "invariants": {
+    "nativeUI": true,
+    "allowWebView": false,
+    "allowHTMLInAPK": false,
+    "allowSliderRemovals": false,
+    "allowSliderRangeChanges": false,
+    "allowSliderDefaultChanges": false,
+    "allowButtonRelabeling": false
+  },
+  "cssVariables": {
+    "bg": "#0f1318",
+    "surface": "#161c24",
+    "surface2": "#1c2430",
+    "surface3": "#222d3a",
+    "accent": "#ff3333",
+    "accent2": "#ff6666",
+    "accent3": "#cc2200",
+    "hot": "#ff2244",
+    "green": "#00e5a0",
+    "text": "#ffffff",
+    "muted": "#a0b8cc",
+    "border": "rgba(255,60,60,0.18)",
+    "border2": "rgba(255,60,60,0.32)",
+    "bordergrey": "rgba(180,200,220,0.15)",
+    "glow": "0 0 24px rgba(255,50,50,0.2)",
+    "glow-hot": "0 0 24px rgba(255,30,30,0.35)"
+  },
+  "slides": [
+    {
+      "id": "ctrl-vol-carrier",
+      "label": "Normal Carrier Volume 0 dB",
+      "min": "-60",
+      "max": "0",
+      "step": "0.5",
+      "default": "0",
+      "display": "0 dB",
+      "note": "Static carrier copy · no movement. 0 dB = matched-baseline ceiling; move left only to make it quieter."
+    },
+    {
+      "id": "ctrl-vol-noise",
+      "label": "Secondary · Affirmation 1 (A) Volume 0.0 dB",
+      "min": "-60",
+      "max": "0",
+      "step": "0.5",
+      "default": "0",
+      "display": "0.0 dB",
+      "note": "0 dB = matched-baseline ceiling; move left only to make Affirmation 1 (A) quieter."
+    },
+    {
+      "id": "ctrl-vol1",
+      "label": "Primary · Affirmation 1 Volume 0.0 dB",
+      "min": "-60",
+      "max": "0",
+      "step": "0.5",
+      "default": "0",
+      "display": "0.0 dB",
+      "note": "0 dB = matched-baseline ceiling; move left only to make Affirmation 1 quieter."
+    },
+    {
+      "id": "ctrl-master-balance-a",
+      "label": "Standard · Primary ↔ Secondary",
+      "min": "-100",
+      "max": "100",
+      "step": "1",
+      "default": "0",
+      "display": "Equal Presence · Both 100%",
+      "note": "Less = lower amount · More = higher amount."
+    },
+    {
+      "id": "ctrl-master-balance-b",
+      "label": "Master 1 · Carrier ↔ Both Affirmations",
+      "min": "-100",
+      "max": "100",
+      "step": "1",
+      "default": "0",
+      "display": "Equal Presence · Both 100%",
+      "note": "Less = lower amount · More = higher amount."
+    },
+    {
+      "id": "ctrl-master-output-db",
+      "label": "Master Audio Volume · Final Output",
+      "min": "-60",
+      "max": "0",
+      "step": "0.5",
+      "default": "0",
+      "display": "Original · 0.0 dB",
+      "note": "Less = lower amount · More = higher amount."
+    },
+    {
+      "id": "ctrl-vol-carrier-8d",
+      "label": "8D Carrier Volume −60.0 dB",
+      "min": "-60",
+      "max": "0",
+      "step": "0.5",
+      "default": "-60",
+      "display": "−60.0 dB",
+      "note": "Same uploaded Carrier file · independent 8D branch volume."
+    },
+    {
+      "id": "ctrl-carrier-hpf",
+      "label": "High-Pass OFF",
+      "min": "0",
+      "max": "10",
+      "step": "1",
+      "default": "0",
+      "display": "OFF",
+      "note": "Optional low-rumble cleanup. OFF keeps the uploaded Carrier unchanged."
+    },
+    {
+      "id": "ctrl-carrier-lpf",
+      "label": "Low-Pass OFF",
+      "min": "0",
+      "max": "10",
+      "step": "1",
+      "default": "0",
+      "display": "OFF",
+      "note": "Optional high-frequency softening. OFF keeps the uploaded Carrier unchanged."
+    },
+    {
+      "id": "ctrl-carrier-width",
+      "label": "Stereo Width 100%",
+      "min": "0",
+      "max": "200",
+      "step": "10",
+      "default": "100",
+      "display": "100%",
+      "note": "100% = original stereo · 0% = mono · above 100% widens only the Normal Carrier branch."
+    },
+    {
+      "id": "ctrl-carrier-fade",
+      "label": "Fade In 0s",
+      "min": "0",
+      "max": "30",
+      "step": "1",
+      "default": "0",
+      "display": "0s",
+      "note": "Session-start Carrier fade only. 0 seconds keeps the existing immediate start."
+    },
+    {
+      "id": "ctrl-carrier-8d-motion",
+      "label": "8D Rotation Speed 25%",
+      "min": "0",
+      "max": "100",
+      "step": "1",
+      "default": "0",
+      "display": "25%",
+      "note": "Width and rotation speed are independent. Neither changes the 8D branch volume."
+    },
+    {
+      "id": "ctrl-carrier-8d-speed",
+      "label": "8D Rotation Speed 25%",
+      "min": "0",
+      "max": "100",
+      "step": "1",
+      "default": "25",
+      "display": "25%",
+      "note": null
+    },
+    {
+      "id": "ctrl-binaural-volume",
+      "label": "Binaural Volume 0.0 dB",
+      "min": "-60",
+      "max": "0",
+      "step": "0.5",
+      "default": "0",
+      "display": "0.0 dB",
+      "note": "0 dB = neutral binaural level, matching the other source controls. This trim changes only the generated tone pair and remains independent of Master 1 and Master 2."
+    },
+    {
+      "id": "ctrl-binaural-beat",
+      "label": "Beat Frequency 10.0 Hz",
+      "min": "1",
+      "max": "30",
+      "step": "0.5",
+      "default": "10",
+      "display": "10.0 Hz",
+      "note": "This is the difference between the left-ear and right-ear tones."
+    },
+    {
+      "id": "ctrl-binaural-center",
+      "label": "Center Tone 400 Hz",
+      "min": "100",
+      "max": "900",
+      "step": "5",
+      "default": "400",
+      "display": "400 Hz",
+      "note": "Audible midpoint. The app places one tone below it and one equally above it."
+    },
+    {
+      "id": "ctrl-rhythmic-volume",
+      "label": "Rhythmic Volume 0.0 dB",
+      "min": "-60",
+      "max": "0",
+      "step": "0.5",
+      "default": "0",
+      "display": "0.0 dB",
+      "note": "0 dB = neutral generated-tone level. This engine is independent of both Master Balance sliders."
+    },
+    {
+      "id": "ctrl-rhythmic-pulse",
+      "label": "Pulse Frequency 6.0 Hz",
+      "min": "0.5",
+      "max": "50",
+      "step": "0.5",
+      "default": "6",
+      "display": "6.0 Hz",
+      "note": "How many amplitude pulses occur each second. Delta and Theta buttons set this same pulse-frequency control; the band label is informational only."
+    },
+    {
+      "id": "ctrl-rhythmic-tone",
+      "label": "Tone Frequency 400 Hz",
+      "min": "100",
+      "max": "900",
+      "step": "5",
+      "default": "400",
+      "display": "400 Hz",
+      "note": "The audible pitch being pulsed. This is separate from the pulse frequency."
+    },
+    {
+      "id": "ctrl-rhythmic-depth",
+      "label": "Pulse Depth 100%",
+      "min": "0",
+      "max": "100",
+      "step": "1",
+      "default": "100",
+      "display": "100%",
+      "note": "100% = full modulation depth. 0% = a constant tone with no rhythmic pulsing."
+    },
+    {
+      "id": "ctrl-secondary-speed",
+      "label": "Secondary Speed 1.00x",
+      "min": "0.10",
+      "max": "3.00",
+      "step": "0.05",
+      "default": "1.00",
+      "display": "1.00x",
+      "note": "When ON, this is the Secondary-only speed. When OFF, it follows Primary exactly."
+    },
+    {
+      "id": "ctrl-na-layer-speed-1",
+      "label": "Speed 1.00x",
+      "min": "0.10",
+      "max": "3.00",
+      "step": "0.05",
+      "default": "1.00",
+      "display": "1.00x",
+      "note": "Primary speed. Secondary uses this same speed whenever Secondary Preset Modification is OFF."
+    },
+    {
+      "id": "ctrl-na-layer-volume-1",
+      "label": "Layer Volume 0.0 dB",
+      "min": "-60",
+      "max": "0",
+      "step": "0.5",
+      "default": "0.0",
+      "display": "0.0 dB",
+      "note": "One shared attenuation-only layer trim. It remains identical for both affirmation streams even when Secondary modification is ON."
+    },
+    {
+      "id": "offline-rate",
+      "label": "Speed 0.85x",
+      "min": "0.4",
+      "max": "1.6",
+      "step": "0.05",
+      "default": "0.85",
+      "display": "0.85x",
+      "note": "Less = slower speech · More = faster speech."
+    },
+    {
+      "id": "offline-pitch",
+      "label": "Pitch 0.90",
+      "min": "0.4",
+      "max": "1.6",
+      "step": "0.05",
+      "default": "0.9",
+      "display": "0.90",
+      "note": "Less = deeper voice · More = higher voice."
+    },
+    {
+      "id": "offline-vol",
+      "label": "Volume 1.0",
+      "min": "0.1",
+      "max": "1.0",
+      "step": "0.05",
+      "default": "1.0",
+      "display": "1.0",
+      "note": "Less = quieter voice · More = louder voice."
+    },
+    {
+      "id": "tts-stability",
+      "label": "Stability 0.50",
+      "min": "0",
+      "max": "1",
+      "step": "0.05",
+      "default": "0.5",
+      "display": "0.50",
+      "note": "Less = more expressive · More = more consistent."
+    },
+    {
+      "id": "tts-similarity",
+      "label": "Similarity 0.75",
+      "min": "0",
+      "max": "1",
+      "step": "0.05",
+      "default": "0.75",
+      "display": "0.75",
+      "note": "Less = looser voice match · More = closer voice match."
+    }
+  ],
+  "selects": [
+    {
+      "id": "ctrl-duration",
+      "options": [
+        "1 minute",
+        "2 minutes",
+        "3 minutes",
+        "4 minutes",
+        "5 minutes",
+        "8 minutes",
+        "10 minutes",
+        "15 minutes",
+        "20 minutes",
+        "30 minutes",
+        "Custom…"
+      ]
+    },
+    {
+      "id": "ctrl-memory-mode",
+      "options": [
+        "Smart · use audio needed for the export",
+        "Memory Saver · repeat first 3 minutes",
+        "Full originals · highest memory use"
+      ]
+    },
+    {
+      "id": "ctrl-samplerate",
+      "options": [
+        "32000 Hz",
+        "44100 Hz",
+        "48000 Hz"
+      ]
+    },
+    {
+      "id": "ctrl-normalize",
+      "options": [
+        "−0.8 dBFS",
+        "−0.2 dBFS",
+        "−3.1 dBFS — safe",
+        "−6.0 dBFS"
+      ]
+    },
+    {
+      "id": "named-preset-select",
+      "options": [
+        "Choose a saved preset…"
+      ]
+    },
+    {
+      "id": "ctrl-rhythmic-shape",
+      "options": [
+        "Isochronic / Gated",
+        "Smooth AM / Sine"
+      ]
+    },
+    {
+      "id": "ctrl-secondary-tone",
+      "options": [
+        "Normal · untouched",
+        "Calm · gently softened",
+        "Sleepy · darker / softer highs",
+        "Deep · darker / warmer color",
+        "Excited · lighter / brighter color"
+      ]
+    },
+    {
+      "id": "tts-model",
+      "options": [
+        "Multilingual v2 (best)",
+        "Turbo v2.5 (fast)",
+        "Monolingual v1"
+      ]
+    }
+  ],
+  "checkboxes": [
+    {
+      "id": "ctrl-fixed-output-lift",
+      "checked": false
+    },
+    {
+      "id": "ctrl-secondary-mod-on",
+      "checked": false
+    },
+    {
+      "id": "ctrl-binaural-on",
+      "checked": false
+    },
+    {
+      "id": "ctrl-rhythmic-on",
+      "checked": false
+    },
+    {
+      "id": "ctrl-affirmation-clarity-on",
+      "checked": false
+    }
+  ],
+  "buttons": [
+    {
+      "id": "ae-diag-toggle",
+      "text": "◉ SUBLIMINAL DIAGNOSTICS"
+    },
+    {
+      "id": "save-work-toggle",
+      "text": "SAVE WORK · OFF"
+    },
+    {
+      "id": "tab-studio",
+      "text": "⚙ Studio"
+    },
+    {
+      "id": "tab-tts",
+      "text": "🧠 HYPNOSIS ENGINE"
+    },
+    {
+      "id": "process-btn",
+      "text": "▶ GENERATE PURE MASTER"
+    },
+    {
+      "id": "preview-btn",
+      "text": "▷ PREVIEW 30 SEC"
+    },
+    {
+      "id": "cancel-render-btn",
+      "text": "■ Cancel Active Render"
+    },
+    {
+      "id": "download-btn",
+      "text": "⬇ DOWNLOAD NAMED WAV"
+    },
+    {
+      "id": "manifest-btn",
+      "text": "⬇ DOWNLOAD MANIFEST JSON"
+    },
+    {
+      "id": "ae-load-hypnosis-as-aff",
+      "text": "↗ USE HYPNOSIS WAV AS PRIMARY AFFIRMATION"
+    },
+    {
+      "id": "ae-hyp-retry",
+      "text": "↻ RELOAD HYPNOSIS VIEW"
+    },
+    {
+      "id": "mode-btn-offline",
+      "text": "📴 OFFLINE Browser built-in · No internet · No key"
+    },
+    {
+      "id": "mode-btn-online",
+      "text": "🌐 ELEVENLABS High quality · Free tier · Needs internet + API key"
+    },
+    {
+      "id": "tts-gen-btn",
+      "text": "🎙 GENERATE AUDIO"
+    },
+    {
+      "id": "mic-rec-btn",
+      "text": "⏺ START RECORDING"
+    },
+    {
+      "id": "mic-stop-btn",
+      "text": "⏹ STOP & SAVE"
+    }
+  ],
+  "screenReference": {
+    "cssViewportWidth": 393,
+    "cssViewportHeight": 850,
+    "pixelScale": 2
+  },
+  "notes": "Extraction of original v1.1 APK. UI is to be reimplemented in native Android Views; the HTML is NOT an app resource. This manifest is an input to visual regression tests, not evidence of visual parity."
+}
