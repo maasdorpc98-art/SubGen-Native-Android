@@ -10,7 +10,7 @@ gradle=(root/'app/build.gradle.kts').read_text()
 assert 'VOICE SPEED · 1.00×' in ui
 assert 'VoiceSpeed.fromPosition(n)' in ui
 assert 'VoiceSpeed.label(selected)' in ui
-assert 'VoiceSpeed.DEFAULT' in speed and 'const val DEFAULT=1.00f' in speed
+assert 'const val DEFAULT=1.00f' in speed and 'VoiceSpeed.DEFAULT' in ui
 assert '↺ RESET VOICE SPEED · 1.00×' in ui
 assert 'getFloat("speed",VoiceSpeed.DEFAULT)' in service
 assert 'speed:Float=VoiceSpeed.DEFAULT' in timeline
