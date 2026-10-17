@@ -227,7 +227,11 @@ class RenderService:Service() {
                     Diagnostics.record("KOKORO_BLOCK_SUCCESS", "",
                         org.json.JSONObject().put("block",finished+1).put("samples",samples.size)
                             .put("renderMs",SystemClock.elapsedRealtime()-t0))
-                    inferenceMs+=SystemClock.elapsedRealtime()-t0;generatedSamples+=samples.size
+                    val elapsedBlockMs=SystemClock.elapsedRealtime()-t0
+                    inferenceMs+=elapsedBlockMs;generatedSamples+=samples.size
+                    val bucket=(finished*4/speechCount).coerceIn(0,3)
+                    quartileMs[bucket]+=elapsedBlockMs
+                    quartileSamples[bucket]+=samples.size
                     if(cancelled.get()){update("Stopped after $finished completed blocks");return}
                     WavIO.writeMono(clip,samples,sr)
                     generated++
