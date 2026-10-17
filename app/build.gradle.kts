@@ -4,11 +4,11 @@ android {
     namespace = "com.subgen.nativeapp"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.subgen.nativeapp.original.speed"
+        applicationId = "com.subgen.nativeapp.original.hypessential"
         minSdk = 29
         targetSdk = 34
-        versionCode = 5
-        versionName = "3.0.5-speed-test"
+        versionCode = 6
+        versionName = "3.0.6-hypnosis-essential-test"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     buildTypes {
