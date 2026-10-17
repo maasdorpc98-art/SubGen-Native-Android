@@ -489,8 +489,117 @@ class MainActivity : Activity() {
         val pack=if(ModelInstaller(this).present())"OFFLINE VOICES INSTALLED" else "INSTALL OFFLINE VOICE PACK"
         action(session,pack,"aqua"){startAction(RenderService.ACTION_INSTALL)}
         action(session,"BENCHMARK · FIND FASTEST CPU SETTING"){startAction(RenderService.ACTION_BENCHMARK)}
+        val directionPanel=hypSection("VOICE DIRECTION · OPTIONAL")
+        txt(directionPanel,"HYPER personality is a WRITING LABEL. Kokoro supports speed; section softness is gain/rate approximation, not neural emotion or true whisper.",10f,cool)
+        val directions=CheckBox(this).apply {
+            text="ENABLE VOICE DIRECTION FOR THIS PROJECT"
+            setTextColor(bright);isChecked=p.getBoolean("dir:enabled",false)
+            setOnCheckedChangeListener{_,checked->
+                p.edit().putBoolean("dir:enabled",checked).apply();refreshHyp?.invoke()
+            }
+        }
+        directionPanel.addView(directions,params())
+        txt(directionPanel,"HYPNOTIST PROFILE · AUTHORING LABEL + ACOUSTIC APPROXIMATIONS",10f,cool,monoFont=true)
+        val profile=Spinner(this).apply{
+            adapter=ArrayAdapter(this@MainActivity,android.R.layout.simple_spinner_item,VoiceDirection.profiles).apply{
+                setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            }
+            setSelection(VoiceDirection.profiles.indexOf(p.getString("dir:profile","MASTER HYPNOTIST")).coerceAtLeast(0))
+            onItemSelectedListener=object:android.widget.AdapterView.OnItemSelectedListener{
+                override fun onNothingSelected(parent:android.widget.AdapterView<*>?){}
+                override fun onItemSelected(parent:android.widget.AdapterView<*>?,view:View?,position:Int,id:Long){
+                    p.edit().putString("dir:profile",VoiceDirection.profiles[position]).apply()
+                    refreshHyp?.invoke()
+                }
+            }
+        }
+        directionPanel.addView(profile,params(d(48)))
+        val gainLabel=txt(directionPanel,"GLOBAL DIRECTION GAIN · +0.0 dB",10f,Color.rgb(201,187,255),monoFont=true)
+        val globalGain=SeekBar(this).apply{
+            max=120;progress=((p.getFloat("dir:gain",0f)+12f)*10).roundToInt().coerceIn(0,120)
+            progressTintList=ColorStateList.valueOf(violet)
+            thumbTintList=ColorStateList.valueOf(Color.rgb(173,147,250))
+        }
+        directionPanel.addView(globalGain,params())
+        globalGain.setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener{
+            override fun onStartTrackingTouch(s:SeekBar){}
+            override fun onStopTrackingTouch(s:SeekBar){}
+            override fun onProgressChanged(s:SeekBar,n:Int,user:Boolean){
+                val db=n/10f-12f
+                gainLabel.text=String.format(Locale.US,"GLOBAL DIRECTION GAIN · %+.1f dB",db)
+                if(user){p.edit().putFloat("dir:gain",db).apply();refreshHyp?.invoke()}
+            }
+        })
+        gainLabel.text=String.format(Locale.US,"GLOBAL DIRECTION GAIN · %+.1f dB",p.getFloat("dir:gain",0f))
+        txt(directionPanel,"SECTION DEFAULTS · select a section, then customize rate/gain",10f,cool,monoFont=true)
+        val sectionSelector=Spinner(this).apply{
+            adapter=ArrayAdapter(this@MainActivity,android.R.layout.simple_spinner_item,VoiceDirection.sections).apply{
+                setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            }
+        }
+        directionPanel.addView(sectionSelector,params(d(48)))
+        val sectionTempoValue=txt(directionPanel,"SECTION RATE",10f,cool,monoFont=true)
+        val sectionTempoBar=SeekBar(this).apply{max=65;progress=25;progressTintList=ColorStateList.valueOf(violet)}
+        directionPanel.addView(sectionTempoBar,params())
+        val sectionGainValue=txt(directionPanel,"SECTION GAIN",10f,cool,monoFont=true)
+        val sectionGainBar=SeekBar(this).apply{max=150;progress=120;progressTintList=ColorStateList.valueOf(violet)}
+        directionPanel.addView(sectionGainBar,params())
+        fun currentSection():String=VoiceDirection.sections[sectionSelector.selectedItemPosition.coerceIn(0,VoiceDirection.sections.lastIndex)]
+        fun refreshRule(){
+            val section=currentSection()
+            val cfg=VoiceDirectionStore.read(p)
+            val rule=cfg.sectionRules[section]?:VoiceDirection.SectionRule()
+            sectionTempoBar.progress=((rule.tempo-.75)*100).roundToInt().coerceIn(0,65)
+            sectionGainBar.progress=((rule.gainDb+12.0)*10).roundToInt().coerceIn(0,150)
+            sectionTempoValue.text=String.format(Locale.US,"%s RATE · %.2fx",section,rule.tempo)
+            sectionGainValue.text=String.format(Locale.US,"%s GAIN · %+.1f dB",section,rule.gainDb)
+        }
+        sectionSelector.onItemSelectedListener=object:android.widget.AdapterView.OnItemSelectedListener{
+            override fun onNothingSelected(parent:android.widget.AdapterView<*>?){}
+            override fun onItemSelected(parent:android.widget.AdapterView<*>?,view:View?,position:Int,id:Long){refreshRule()}
+        }
+        sectionTempoBar.setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener{
+            override fun onStartTrackingTouch(s:SeekBar){}
+            override fun onStopTrackingTouch(s:SeekBar){}
+            override fun onProgressChanged(s:SeekBar,n:Int,user:Boolean){
+                val value=.75f+n/100f
+                sectionTempoValue.text=String.format(Locale.US,"%s RATE · %.2fx",currentSection(),value)
+                if(user){p.edit().putFloat("dir:${currentSection()}:tempo",value).apply();refreshHyp?.invoke()}
+            }
+        })
+        sectionGainBar.setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener{
+            override fun onStartTrackingTouch(s:SeekBar){}
+            override fun onStopTrackingTouch(s:SeekBar){}
+            override fun onProgressChanged(s:SeekBar,n:Int,user:Boolean){
+                val db=n/10f-12f
+                sectionGainValue.text=String.format(Locale.US,"%s GAIN · %+.1f dB",currentSection(),db)
+                if(user){p.edit().putFloat("dir:${currentSection()}:gain",db).apply();refreshHyp?.invoke()}
+            }
+        })
+        action(directionPanel,"↺ RESTORE SECTION PROFILE DEFAULTS"){
+            p.edit().remove("dir:${currentSection()}:tempo").remove("dir:${currentSection()}:gain").apply()
+            refreshRule();refreshHyp?.invoke()
+        }
+        refreshRule()
         val editor=hypSection("02 — HYPNOSIS SCRIPT")
-        txt(editor,"[SECTION] · [PAUSE: 5] · [SLOW] · [SOFT] · [WHISPER] · [NORMAL]",10f,cool,monoFont=true)
+        txt(editor,"[SECTION: NAME] · [pause 2] · [SOFT] · [SLOW] · [WHISPER≈] · [NORMAL] · [tempo 0.90] · [volume -2dB]",10f,cool,monoFont=true)
+        fun pauseSetting(key:String,title:String,default:Float){
+            val value=txt(editor,title,10f,cool,monoFont=true)
+            val bar=SeekBar(this).apply{max=120;progress=(p.getFloat(key,default)*2).roundToInt().coerceIn(0,120)
+                progressTintList=ColorStateList.valueOf(violet)}
+            editor.addView(bar,params())
+            fun refresh(){value.text=String.format(Locale.US,"%s · %.1f sec",title,p.getFloat(key,default))}
+            bar.setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener{
+                override fun onStartTrackingTouch(s:SeekBar){}
+                override fun onStopTrackingTouch(s:SeekBar){}
+                override fun onProgressChanged(s:SeekBar,n:Int,user:Boolean){
+                    value.text=String.format(Locale.US,"%s · %.1f sec",title,n/2f)
+                    if(user){p.edit().putFloat(key,n/2f).apply();refreshHyp?.invoke()}
+                }
+            });refresh()
+        }
+        pauseSetting("hyp:breatheSec","[breathe] PAUSE",5f)
+        pauseSetting("hyp:paragraphSec","[paragraph] PAUSE",3f)
         val field=textEntry(editor,"Write or paste your hypnosis script","script",p.getString("script","")?:"")
         action(editor,"IMPORT SCRIPT .TXT"){val i=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="text/plain"};@Suppress("DEPRECATION")startActivityForResult(i,910)}
         val check=hypSection("03 — SCRIPT CHECK + TIMELINE")
@@ -501,7 +610,7 @@ class MainActivity : Activity() {
         val timeline=panel(check,fill=Color.rgb(17,24,32),border=Color.rgb(76,61,119),radius=11,padding=13,margin=5)
         val previewLines=txt(timeline,"",10f,cool,monoFont=true)
         action(check,"VIEW FULL SCRIPT TIMELINE") {
-            val summary=ScriptTimeline.analyze(field.text.toString(),p.getFloat("speed",VoiceSpeed.DEFAULT))
+            val summary=ScriptTimeline.analyze(field.text.toString(),p.getFloat("speed",VoiceSpeed.DEFAULT),breathe=p.getFloat("hyp:breatheSec",5f).toDouble(),paragraph=p.getFloat("hyp:paragraphSec",3f).toDouble(),direction=VoiceDirectionStore.read(p))
             val detail=buildString {
                 append("Speech timing is estimated; pauses are exact.\n\n")
                 for(row in summary.rows) {
@@ -519,8 +628,30 @@ class MainActivity : Activity() {
         }
         val voicePreview=hypSection("04 — NEURAL VOICE PREVIEW")
         txt(voicePreview,"Listen to the selected Kokoro voice before a full render. The preview uses your current voice and speech speed.",10f,cool,monoFont=true)
-        action(voicePreview,"▶ GENERATE SELECTED VOICE PREVIEW","aqua"){startAction(RenderService.ACTION_PREVIEW)}
-        action(voicePreview,"▶ PLAY GENERATED VOICE"){playPreview()}
+        textEntry(voicePreview,"Phrase or paragraph to audition","dir:previewText",
+            p.getString("dir:previewText","Take a slow, comfortable breath. You can relax now.")?:"Take a slow, comfortable breath. You can relax now.")
+        txt(voicePreview,"PREVIEW SECTION · choose matching script section",10f,cool,monoFont=true)
+        val previewSection=Spinner(this).apply{
+            adapter=ArrayAdapter(this@MainActivity,android.R.layout.simple_spinner_item,VoiceDirection.sections).apply{
+                setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            }
+            setSelection(VoiceDirection.sections.indexOf(p.getString("dir:previewSection","INDUCTION")).coerceAtLeast(0))
+            onItemSelectedListener=object:android.widget.AdapterView.OnItemSelectedListener{
+                override fun onNothingSelected(parent:android.widget.AdapterView<*>?){}
+                override fun onItemSelected(parent:android.widget.AdapterView<*>?,view:View?,position:Int,id:Long){
+                    p.edit().putString("dir:previewSection",VoiceDirection.sections[position]).apply()
+                }
+            }
+        }
+        voicePreview.addView(previewSection,params(d(46)))
+        action(voicePreview,"▶ GENERATE DIRECTED PHRASE","aqua"){
+            p.edit().putBoolean("dir:previewNeutral",false).apply();startAction(RenderService.ACTION_PREVIEW)
+        }
+        action(voicePreview,"▶ PLAY DIRECTED PHRASE"){playPreview("native-preview-directed.wav")}
+        action(voicePreview,"▶ GENERATE NEUTRAL A/B COMPARISON"){
+            p.edit().putBoolean("dir:previewNeutral",true).apply();startAction(RenderService.ACTION_PREVIEW)
+        }
+        action(voicePreview,"▶ PLAY NEUTRAL COMPARISON"){playPreview("native-preview-neutral.wav")}
         val output=hypSection("05 — OUTPUT / RENDER")
         txt(output,"PCM 16-BIT WAV · EXACT PAUSES · LOCAL PROCESSING",10f,cool,monoFont=true)
         space(output,12)
@@ -601,7 +732,7 @@ class MainActivity : Activity() {
         space(info,6)
         val guidance=txt(info,"",10f,cool,monoFont=true)
         updateSummary={
-            val summary=ScriptTimeline.analyze(field.text.toString(),p.getFloat("speed",VoiceSpeed.DEFAULT))
+            val summary=ScriptTimeline.analyze(field.text.toString(),p.getFloat("speed",VoiceSpeed.DEFAULT),breathe=p.getFloat("hyp:breatheSec",5f).toDouble(),paragraph=p.getFloat("hyp:paragraphSec",3f).toDouble(),direction=VoiceDirectionStore.read(p))
             stats.text="SPOKEN BLOCKS  "+summary.speechBlocks+
                 "\nPAUSE BLOCKS  "+summary.pauseBlocks+
                 "\nTOTAL EXACT SILENCE  "+ScriptTimeline.time(summary.silenceSeconds)+
@@ -609,7 +740,7 @@ class MainActivity : Activity() {
                 "\nESTIMATED SESSION  "+ScriptTimeline.time(summary.totalSeconds)
             val markerNames=summary.markers.joinToString(" · ")
             val hasMain=summary.markers.any { it.contains("SUGGEST",true) || it.contains("MAIN",true) }
-            val unknown=summary.rows.count{it.kind=="NOTICE"}
+            val unknown=summary.invalidCommands
             checks.text="SECTIONS  "+(if(markerNames.isBlank())"No named sections" else markerNames.take(240))+
                 "\nMAIN SUGGESTIONS  "+(if(hasMain)"✓ Marked" else "! No labelled section")+
                 "\nUNRECOGNISED TAGS  "+unknown+
@@ -620,12 +751,16 @@ class MainActivity : Activity() {
             val hz=p.getInt("hyp:sampleRate",24000)
             val channels=p.getInt("hyp:channels",2)
             val mb=ScriptTimeline.estimatedWavBytes(summary.totalSeconds,hz,channels)/1e6
-            estimated.text="ESTIMATED DURATION  ·  "+ScriptTimeline.time(summary.totalSeconds)
+            estimated.text="ESTIMATED DURATION  ·  "+ScriptTimeline.time(summary.totalSeconds)+
+                " (range "+ScriptTimeline.time(summary.lowerSeconds)+"–"+ScriptTimeline.time(summary.upperSeconds)+")"+
+                (if(p.getString("hyp:lastScriptHash","")==StateStore.hash(field.text.toString()) && p.getLong("hyp:lastFinalFrames",0)>0)
+                    "\nACTUAL LAST EXPORT · "+ScriptTimeline.time(p.getLong("hyp:lastFinalFrames",0).toDouble()/p.getInt("hyp:lastRate",24000)) else "")
             size.text=String.format(Locale.US,"ESTIMATED WAV SIZE  ·  %.1f MB",mb)
             guidance.text=(if(channels==1 && p.getBoolean("binaural",false))
                 "Mono export omits binaural stereo separation.\n" else "")+
                 "24 kHz is Kokoro's original voice rate; higher rates do not add new speech detail. "+
-                "Output gain stays below the selected peak ceiling."
+                "Output gain stays below the selected peak ceiling. "+
+                "WHISPER is speed approximation, not true neural whisper. Invalid codes block rendering."
         }
         refreshHyp=updateSummary
         field.addTextChangedListener(object:TextWatcher{
@@ -639,14 +774,14 @@ class MainActivity : Activity() {
         action(output,"⬇ OPEN SAVED WAV","green"){openOutput()}
         status=txt(output,"Native Kokoro · Ready",10f,cool,monoFont=true)
         txt(output,"A foreground notification tracks processing. Completed spoken blocks remain saved for later sessions.",10f,cool)
-        txt(body,"HYPNOSIS STUDIO v2.3 · Native Android · Kokoro neural engine",9f,cool,monoFont=true,gravity=Gravity.CENTER)
+        txt(body,"HYPNOSIS STUDIO v3.1 · Native Android · HYPER Voice Direction",9f,cool,monoFont=true,gravity=Gravity.CENTER)
     }
     private fun hypSection(s:String):LinearLayout{
         val pane=panel(body,fill=Color.rgb(23,29,43),border=Color.rgb(79,63,124),radius=12,padding=16,margin=16)
         txt(pane,s,11f,Color.rgb(181,160,255),monoFont=true,tracking=.18f);space(pane,15);return pane
     }
-    private fun playPreview(){runCatching{
-        val f=File(filesDir,"native-voice-preview.wav");require(f.length()>44){"Generate preview first"}
+    private fun playPreview(filename:String="native-voice-preview.wav"){runCatching{
+        val f=File(filesDir,filename);require(f.length()>44){"Generate preview first"}
         val player=android.media.MediaPlayer().apply{setDataSource(f.absolutePath);setOnCompletionListener{it.release()};prepare();start()}
     }.onFailure{Toast.makeText(this,it.message,Toast.LENGTH_LONG).show()}}
     private fun startAction(action:String?){runCatching{

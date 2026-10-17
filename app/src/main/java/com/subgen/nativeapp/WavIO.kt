@@ -133,10 +133,24 @@ object WavIO {
                     }
                 }
             }
+            var previousGain=1.0
             for(i in nodes.indices) when(val node=nodes[i]){
                 is ScriptNode.Pause -> addPause((node.seconds*sr).roundToLong())
                 is ScriptNode.Speech -> {
                     val clip=clips[i]?:error("Missing validated clip")
+                    val gainDb=node.gainDb?:0.0
+                    require(gainDb.isFinite() && gainDb in -30.0..6.0){"Unsafe phrase gain"}
+                    val targetGain=10.0.pow(gainDb/20.0)
+                    var position=0L
+                    // 8 ms amplitude ramp uses existing PCM frames; never changes pause length.
+                    fun applyGain(sample:Int):Int {
+                        val fade=(position.toDouble()/192.0).coerceIn(0.0,1.0)
+                        val applied=previousGain+(targetGain-previousGain)*fade
+                        position++
+                        val result=sample*applied
+                        require(result in -32767.0..32767.0){"Phrase gain would clip speech; lower section or phrase gain"}
+                        return result.toInt()
+                    }
                     clip.open().buffered(65536).use { input ->
                         var remaining=clip.frames
                         while(remaining>0){
@@ -153,7 +167,7 @@ object WavIO {
                                     val p=k*2
                                     val sample=((inputBytes[p].toInt() and 255) or
                                         ((inputBytes[p+1].toInt() and 255) shl 8)).toShort().toInt()
-                                    appendWithBinaural(sample)
+                                    appendWithBinaural(applyGain(sample))
                                 }
                             } else {
                                 for(k in 0 until count) {
@@ -161,7 +175,7 @@ object WavIO {
                                     val sample=((inputBytes[p].toInt() and 255) or
                                         ((inputBytes[p+1].toInt() and 255) shl 8)).toShort().toInt()
                                     // Preserve the legacy 32767/32768 scaling exactly.
-                                    val pcm=floatToS16((sample/32768.0).toFloat())
+                                    val pcm=floatToS16((applyGain(sample)/32768.0).toFloat())
                                     val q=k*4
                                     val lo=(pcm and 255).toByte()
                                     val hi=(pcm ushr 8).toByte()
@@ -174,6 +188,7 @@ object WavIO {
                             remaining-=count
                         }
                     }
+                    previousGain=targetGain
                 }
                 else -> Unit
             }

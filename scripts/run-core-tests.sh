@@ -12,9 +12,15 @@ kotlinc "$K/ScriptParser.kt" "$K/WavIO.kt" "$K/NativeSubliminal.kt" scripts/test
 java -jar /tmp/subgen-native-audio-test.jar
 kotlinc "$K/ScriptParser.kt" "$K/WavIO.kt" scripts/test_fast_wav.kt tests/stubs/*.kt -include-runtime -d /tmp/subgen-native-fast-pcm-test.jar
 java -jar /tmp/subgen-native-fast-pcm-test.jar
-kotlinc "$K/ScriptParser.kt" "$K/ScriptTimeline.kt" "$K/VoiceSpeed.kt" "$K/WavIO.kt" "$K/OutputFormat.kt" scripts/test_hypnosis_output.kt tests/stubs/*.kt -include-runtime -d /tmp/subgen-hyp-output-test.jar
+kotlinc "$K/ScriptParser.kt" "$K/ScriptTimeline.kt" "$K/VoiceDirection.kt" "$K/VoiceSpeed.kt" "$K/WavIO.kt" "$K/OutputFormat.kt" scripts/test_hypnosis_output.kt tests/stubs/*.kt -include-runtime -d /tmp/subgen-hyp-output-test.jar
 java -jar /tmp/subgen-hyp-output-test.jar
 kotlinc "$K/WorkerPolicy.kt" scripts/test_worker_policy.kt -include-runtime -d /tmp/subgen-worker-policy-test.jar
 java -jar /tmp/subgen-worker-policy-test.jar
 kotlinc "$K/VoiceSpeed.kt" scripts/test_voice_speed.kt -include-runtime -d /tmp/subgen-voice-speed-test.jar
 java -jar /tmp/subgen-voice-speed-test.jar
+
+kotlinc "$K/ScriptParser.kt" "$K/VoiceDirection.kt" "$K/ScriptTimeline.kt" "$K/VoiceSpeed.kt" scripts/test_hyper_voice.kt -include-runtime -d /tmp/subgen-hyper-voice-tests.jar
+java -jar /tmp/subgen-hyper-voice-tests.jar
+
+kotlinc "$K/ScriptParser.kt" "$K/WavIO.kt" scripts/test_voice_pcm.kt tests/stubs/*.kt -include-runtime -d /tmp/subgen-hyper-voice-pcm.jar
+java -jar /tmp/subgen-hyper-voice-pcm.jar

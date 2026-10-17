@@ -1,55 +1,124 @@
 package com.subgen.nativeapp
 
-/** Pure Kotlin; does not depend on Android. All pauses are measured in output samples. */
+/** Pure Kotlin timeline: authoring directives are never synthesizer input. */
 sealed interface ScriptNode {
-    data class Speech(val text: String, val delivery: String): ScriptNode
-    data class Pause(val seconds: Double): ScriptNode
-    data class Section(val name: String): ScriptNode
-    data class Unknown(val command: String): ScriptNode
+    data class Speech(val text:String, val delivery:String,
+                      val tempo:Double?=null, val gainDb:Double?=null,
+                      val section:String=""):ScriptNode
+    data class Pause(val seconds:Double):ScriptNode
+    data class Section(val name:String):ScriptNode
+    data class DeliveryChange(val mode:String):ScriptNode
+    data class Unknown(val command:String):ScriptNode
 }
 
+/** Tokenize at arbitrary Unicode offsets; never silently swallow malformed controls. */
 object ScriptParser {
-    private val section = Regex("^\\[(?:SECTION\\s*:\\s*|STAGE\\s+)(.+?)\\]$", RegexOption.IGNORE_CASE)
-    private val pause = Regex("^\\[PAUSE\\s*:?\\s*(\\d+(?:\\.\\d+)?)\\]$",RegexOption.IGNORE_CASE)
-    private val mode = Regex("^\\[(NORMAL|SLOW|SOFT|WHISPER)\\]$",RegexOption.IGNORE_CASE)
-    private val command = Regex("^\\[[A-Za-z][^]]*]$")
-    private val sentenceEnd = Regex("(?<=[.!?…])\\s+")
-    fun parse(script: String, breathe: Double = 5.0, paragraph: Double = 3.0, maxSpeechChars: Int = 440): List<ScriptNode> {
-        val out = mutableListOf<ScriptNode>()
-        var delivery="NORMAL";val text=StringBuilder()
+    const val MAX_PAUSE_SECONDS=3600.0
+    private val bracket=Regex("^\\[([^\\]\\n]{0,160})]$")
+    private val pause=Regex("^pause\\s*:?\\s*(\\d+(?:\\.\\d+)?)$",RegexOption.IGNORE_CASE)
+    private val mode=Regex("^(NORMAL|SLOW|SOFT|WHISPER)$",RegexOption.IGNORE_CASE)
+    private val section=Regex("^(?:SECTION\\s*:\\s*|STAGE\\s+)(.+)$",RegexOption.IGNORE_CASE)
+    private val tempo=Regex("^tempo\\s+(.+)$",RegexOption.IGNORE_CASE)
+    private val volume=Regex("^volume\\s+(.+)$",RegexOption.IGNORE_CASE)
+    private val realNumber=Regex("^(?:0|[1-9]\\d*)(?:\\.\\d+)?$")
+    private val signedDb=Regex("^[+-]?(?:0|[1-9]\\d*)(?:\\.\\d+)?dB$",RegexOption.IGNORE_CASE)
+    private val sentenceEnd=Regex("(?<=[.!?…])\\s+")
+    private val planner=Regex("^@[A-Za-z][A-Za-z_0-9]*(?:\\([^\\n)]*\\))?")
+
+    fun parse(script:String,breathe:Double=5.0,paragraph:Double=3.0,maxSpeechChars:Int=440):List<ScriptNode> {
+        require(maxSpeechChars>=16){"Speech chunk limit must be at least 16"}
+        require(breathe.isFinite()&&breathe in 0.0..MAX_PAUSE_SECONDS){"Invalid breathing pause"}
+        require(paragraph.isFinite()&&paragraph in 0.0..MAX_PAUSE_SECONDS){"Invalid paragraph pause"}
+        val nodes=mutableListOf<ScriptNode>()
+        val speech=StringBuilder()
+        var delivery="NORMAL"
+        var activeTempo:Double?=null
+        var activeGain:Double?=null
+        var activeSection=""
+        fun push(text:String) {
+            if(text.isNotBlank())nodes+=ScriptNode.Speech(text.trim(),delivery,activeTempo,activeGain,activeSection)
+        }
         fun flush() {
-            val str=text.toString().trim().replace(Regex("\\s+"), " ")
-            text.clear()
-            if(str.isEmpty()) return
-            var part=""
-            fun push() { if(part.isNotBlank()) out.add(ScriptNode.Speech(part.trim(),delivery)); part="" }
-            for(sentence in str.split(sentenceEnd)) {
-                if (sentence.length > maxSpeechChars) {
-                    push(); var s=sentence.trim()
-                    while(s.length > maxSpeechChars) {
-                        var cut=s.lastIndexOf(' ',maxSpeechChars)
-                        if(cut < maxSpeechChars / 2) cut=maxSpeechChars
-                        out.add(ScriptNode.Speech(s.substring(0,cut).trim(),delivery)); s=s.substring(cut).trim()
+            val raw=speech.toString().trim().replace(Regex("\\s+")," ")
+            speech.clear()
+            if(raw.isEmpty())return
+            var pending=""
+            fun commit(){push(pending);pending=""}
+            for(part in raw.split(sentenceEnd)) {
+                if(part.length>maxSpeechChars) {
+                    commit()
+                    var rest=part
+                    while(rest.length>maxSpeechChars) {
+                        var at=rest.lastIndexOf(' ',maxSpeechChars)
+                        if(at<maxSpeechChars/2)at=maxSpeechChars
+                        push(rest.substring(0,at));rest=rest.substring(at).trimStart()
                     }
-                    if(s.isNotEmpty()) part=s
-                } else if(part.length + sentence.length + 1 > maxSpeechChars) { push(); part=sentence }
-                else part=(part+" "+sentence).trim()
+                    pending=rest
+                } else if(pending.isNotEmpty()&&pending.length+part.length+1>maxSpeechChars){commit();pending=part}
+                else pending=if(pending.isEmpty())part else "$pending $part"
             }
-            push()
+            commit()
         }
-        for(src in script.replace("\r","").lines()) {
-            val line=src.trim();val m=section.matchEntire(line); val p=pause.matchEntire(line)
+        fun handle(token:String):Boolean {
+            val inside=bracket.matchEntire(token)?.groupValues?.get(1)?.trim()?:return false
+            val m=mode.matchEntire(inside)
+            val s=section.matchEntire(inside)
+            val p=pause.matchEntire(inside)
+            val t=tempo.matchEntire(inside)
+            val v=volume.matchEntire(inside)
             when {
-                m!=null->{flush();out+=ScriptNode.Section(m.groupValues[1].trim())}
-                p!=null->{flush();out+=ScriptNode.Pause(p.groupValues[1].toDouble().coerceIn(0.0,120.0))}
-                line.equals("[BREATHE]",true)->{flush();out+=ScriptNode.Pause(breathe.coerceIn(0.0,30.0))}
-                line.equals("[PARAGRAPH]",true)->{flush();out+=ScriptNode.Pause(paragraph.coerceIn(0.0,30.0))}
-                mode.matches(line)->{flush();delivery=mode.matchEntire(line)!!.groupValues[1].uppercase()}
-                line.isBlank()->flush()
-                command.matches(line)->{flush();out+=ScriptNode.Unknown(line)}
-                else->{if(text.isNotEmpty())text.append(' ');text.append(line)}
+                m!=null->{flush();delivery=m.groupValues[1].uppercase();nodes+=ScriptNode.DeliveryChange(delivery)}
+                s!=null->{flush();val declared=s.groupValues[1].trim()
+                    if(declared.isEmpty())nodes+=ScriptNode.Unknown(token)
+                    else {
+                        nodes+=ScriptNode.Section(declared)
+                        val code=declared.uppercase()
+                        if(listOf("ARRIVAL","INDUCTION","DEEPENER","FRACTIONATION","SUGGESTION","REINFORCEMENT","INTEGRATION","WAKE","SLEEP","VOID","DEEP TRANCE").any{code.startsWith(it)})
+                            activeSection=declared // custom sections inherit the prior delivery default
+                    }}
+                p!=null->{flush();val value=p.groupValues[1].toDoubleOrNull()
+                    if(value==null||!value.isFinite()||value>MAX_PAUSE_SECONDS)nodes+=ScriptNode.Unknown(token)
+                    else nodes+=ScriptNode.Pause(value)}
+                inside.equals("breathe",true)->{flush();nodes+=ScriptNode.Pause(breathe)}
+                inside.equals("paragraph",true)->{flush();nodes+=ScriptNode.Pause(paragraph)}
+                t!=null->{flush();val arg=t.groupValues[1].trim()
+                    if(arg.equals("reset",true))activeTempo=null
+                    else {val value=if(realNumber.matches(arg))arg.toDoubleOrNull() else null
+                        if(value==null||!value.isFinite()||value !in 0.65..1.50)nodes+=ScriptNode.Unknown(token)
+                        else activeTempo=value}}
+                v!=null->{flush();val arg=v.groupValues[1].trim()
+                    if(arg.equals("reset",true))activeGain=null
+                    else {val value=if(signedDb.matches(arg))arg.dropLast(2).toDoubleOrNull() else null
+                        if(value==null||!value.isFinite()||value !in -18.0..6.0)nodes+=ScriptNode.Unknown(token)
+                        else activeGain=value}}
+                // Unknown likely command: never let typos such as [pauze 2] reach Kokoro.
+                Regex("^(?:pause|pauze|tempo|volume|gain|speed|delivery|section|stage|breathe|paragraph|slow|soft|whisper|normal)\\b.*",RegexOption.IGNORE_CASE).matches(inside)->{flush();nodes+=ScriptNode.Unknown(token)}
+                else->return false // ordinary bracketed narration, e.g. [the door opens]
             }
+            return true
         }
-        flush();return out
+        var i=0
+        while(i<script.length){
+            val c=script[i]
+            if(c=='\\'&&i+1<script.length&&script[i+1]=='['){
+                // Explicit literal escape. Keep the complete bracket phrase as spoken text.
+                speech.append('[');i+=2;continue
+            }
+            if(c=='['){
+                val end=script.indexOf(']',i+1)
+                if(end>i && end-i<=162 && handle(script.substring(i,end+1))){i=end+1;continue}
+            }
+            if(c=='@'&&(i==0||!script[i-1].isLetterOrDigit())){
+                val plannerToken=planner.find(script.substring(i))?.takeIf{it.range.first==0}
+                if(plannerToken!=null){flush();nodes+=ScriptNode.Unknown(plannerToken.value);i+=plannerToken.value.length;continue}
+            }
+            // Text remains continuous across ordinary newlines. Exact pauses come from codes.
+            if(c=='\n'||c=='\r'||c=='\t'){
+                if(speech.isNotEmpty()&&!speech.last().isWhitespace())speech.append(' ')
+            } else speech.append(c)
+            i++
+        }
+        flush()
+        return nodes
     }
 }

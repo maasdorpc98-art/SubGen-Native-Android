@@ -53,15 +53,44 @@ class RenderService:Service() {
     private fun installOnly(){Diagnostics.stage("MODEL_INSTALL");ModelInstaller(this).install(::update)}
     private fun previewVoice(){
         Diagnostics.stage("VOICE_PREVIEW")
-        val p=StateStore.prefs(this);val voice=p.getString("voice","SERENA")?:"SERENA"
+        val p=StateStore.prefs(this)
+        val voice=p.getString("voice","SERENA")?:"SERENA"
         val sid=KokoroNative.voices[voice]?:3
+        val neutral=p.getBoolean("dir:previewNeutral",false)
+        val config=if(neutral) VoiceDirection.Config() else VoiceDirectionStore.read(p)
+        val speed=p.getFloat("speed",VoiceSpeed.DEFAULT)
+        val raw=p.getString("dir:previewText","Take a slow, comfortable breath. You can relax now.")
+            ?.take(1100)?.ifBlank{"Take a slow, comfortable breath. You can relax now."}
+            ?:"Take a slow, comfortable breath. You can relax now."
+        val source="[SECTION: "+(p.getString("dir:previewSection","INDUCTION")?:"INDUCTION")+"] "+raw
+        val nodes=ScriptParser.parse(source,p.getFloat("hyp:breatheSec",5f).toDouble(),p.getFloat("hyp:paragraphSec",3f).toDouble(),maxSpeechChars=160)
+        val errors=nodes.filterIsInstance<ScriptNode.Unknown>()
+        require(errors.isEmpty()){"Invalid preview code: "+errors.joinToString{it.command}}
         val installer=ModelInstaller(this);installer.install(::update)
-        update("Generating $voice preview in native engine…")
-        KokoroNative(installer,InferenceTuner.threads(this)).use {tts->
-            val (data,rate)=tts.synthesize("Take a slow, comfortable breath. You can relax now.",sid,p.getFloat("speed",VoiceSpeed.DEFAULT)){cancelled.get()}
-            WavIO.writeMono(java.io.File(filesDir,"native-voice-preview.wav"),data,rate)
+        update("Generating ${if(neutral)"neutral" else "directed"} voice preview…")
+        val clips=MutableList<File?>(nodes.size){null}
+        val prepared=nodes.mapIndexed { i,node ->
+            if(node is ScriptNode.Speech){
+                val settings=VoiceDirection.resolve(node,speed,config)
+                require(settings.speed in .6f..1.4f){"Voice preview tempo out of range"}
+                node.copy(gainDb=settings.gainDb)
+            } else node
         }
-        update("VOICE PREVIEW READY · tap PLAY PREVIEW")
+        KokoroNative(installer,InferenceTuner.threads(this)).use {tts ->
+            prepared.forEachIndexed { index,node ->
+                if(cancelled.get())return
+                if(node is ScriptNode.Speech){
+                    val r=VoiceDirection.resolve(nodes[index] as ScriptNode.Speech,speed,config)
+                    val (data,rate)=tts.synthesize(node.text,sid,r.speed){cancelled.get()}
+                    val f=File(cacheDir,"subgen-preview-block-$index.wav")
+                    WavIO.writeMono(f,data,rate);clips[index]=f
+                }
+            }
+        }
+        val name=if(neutral)"native-preview-neutral.wav" else "native-preview-directed.wav"
+        try{WavIO.assemble(prepared,clips,File(filesDir,name))}
+        finally{clips.filterNotNull().forEach{it.delete()}}
+        update("PREVIEW READY · $name")
     }
     private fun benchmark(){
         Diagnostics.stage("VOICE_BENCHMARK")
@@ -161,7 +190,19 @@ class RenderService:Service() {
         var threads=InferenceTuner.threads(this)
         Diagnostics.record("SPEED_ENGINE","FP32 + adaptive inference workers + cache-first pipeline")
         val name=prefs.getString("name","Hypnosis Session")?:"Hypnosis Session"
-        val nodes=ScriptParser.parse(script,maxSpeechChars=160)
+        val rawNodes=ScriptParser.parse(script,prefs.getFloat("hyp:breatheSec",5f).toDouble(),prefs.getFloat("hyp:paragraphSec",3f).toDouble(),maxSpeechChars=160)
+        val unknown=rawNodes.filterIsInstance<ScriptNode.Unknown>()
+        require(unknown.isEmpty()){
+            "Unsupported audio or HYPER planner code: "+unknown.take(3).joinToString {it.command}
+        }
+        val direction=VoiceDirectionStore.read(prefs)
+        val nodes=rawNodes.map { node->
+            if(node is ScriptNode.Speech) {
+                val r=VoiceDirection.resolve(node,speed,direction)
+                require(r.speed in 0.6f..1.4f){"Effective voice tempo outside Kokoro 0.60–1.40; reduce tempo or global speed"}
+                node.copy(gainDb=r.gainDb)
+            } else node
+        }
         val speechCount=nodes.count{it is ScriptNode.Speech}
         require(speechCount>0){"Script contains no spoken text"}
         val checkpointFiles=MutableList<File?>(nodes.size){null}
@@ -170,7 +211,9 @@ class RenderService:Service() {
         val cacheScanStart=SystemClock.elapsedRealtime()
         nodes.forEachIndexed { index, n ->
             if(n !is ScriptNode.Speech) return@forEachIndexed
-            val key=StateStore.hash("native-kokoro-v1_0-fp32-validated|${sid}|${speed}|${n.delivery}|${n.text}")
+            val resolved=VoiceDirection.resolve(rawNodes[index] as ScriptNode.Speech,speed,direction)
+            val cacheSpeed=if(direction.enabled||n.tempo!=null) resolved.speed else speed
+            val key=StateStore.hash("native-kokoro-v1_0-fp32-validated|${sid}|${cacheSpeed}|${n.delivery}|${n.text}")
             val clip=File(StateStore.blocksDir(this),"$key.wav")
             val header=runCatching{WavIO.loadMono(clip)}.getOrNull()
             checkpointFiles[index]=clip
@@ -211,14 +254,14 @@ class RenderService:Service() {
                 if(cached[index] || runCatching{val c=WavIO.loadMono(clip);c.rate==24000&&c.frames>0}.getOrDefault(false)){cacheHits++}
                 else {
                     val activeTts=tts?:error("Synthesis engine missing for uncached speech block")
-                    val deliverySpeed=when(n.delivery){"SLOW"->.82f;"SOFT"->.94f;"WHISPER"->.90f;else->1f}
                     if(finished==0 || finished%6==0)update("Generating ${finished+1} / $speechCount · $voice · saved $finished")
                     val t0=SystemClock.elapsedRealtime()
                     Diagnostics.beforeNative("KOKORO_BLOCK_START",org.json.JSONObject()
                         .put("block",finished+1).put("speechBlocks",speechCount)
                         .put("chars",n.text.length).put("delivery",n.delivery),
                         durable=(finished==0 || finished%16==0))
-                    val (samples,sr)=activeTts.synthesize(n.text,sid,speed*deliverySpeed){cancelled.get()}
+                    val effective=VoiceDirection.resolve(rawNodes[index] as ScriptNode.Speech,speed,direction)
+                    val (samples,sr)=activeTts.synthesize(n.text,sid,effective.speed){cancelled.get()}
                     Diagnostics.record("KOKORO_BLOCK_SUCCESS", "",
                         org.json.JSONObject().put("block",finished+1).put("samples",samples.size)
                             .put("renderMs",SystemClock.elapsedRealtime()-t0))
@@ -294,7 +337,15 @@ class RenderService:Service() {
             .put("elapsedMs",SystemClock.elapsedRealtime()-exportStart).put("bytes",finalPath.length()))
         val rtf=if(generatedSamples>0)inferenceMs/1000.0/(generatedSamples/24000.0) else 0.0
         update("SAVED · ${"%.1f".format(sec/60)} min · $generated new / $cacheHits reused · RTF ${"%.2f".format(rtf)} · Downloads/SubGen")
-        StateStore.prefs(this).edit().putString("lastFileUri",uri.toString()).apply()
+        prefs.edit().putString("lastFileUri",uri.toString())
+            .putLong("hyp:lastFinalFrames",(formatted.bytes-44L)/(formatted.channels*2))
+            .putInt("hyp:lastRate",formatted.rate)
+            .putString("hyp:lastScriptHash",StateStore.hash(prefs.getString("script","")?:""))
+            .apply()
+        val voiceFrames=nodes.indices.sumOf { i ->
+            if(nodes[i] is ScriptNode.Speech) WavIO.loadMono(checkpointFiles[i]!!).frames else 0L
+        }
+        prefs.edit().putLong("hyp:lastVoiceFrames",voiceFrames).apply()
     }
     private fun update(message:String){Diagnostics.progress(message);StateStore.status(this,message);(getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(ID,notification(message))}
     private fun notification(message:String):Notification {
