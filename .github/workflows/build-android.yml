@@ -2,7 +2,7 @@ name: Native Android APK
 on:
   workflow_dispatch:
   push:
-    branches: [main, subgen-v3.0.1-diagnostic-apk, subgen-v3.0.2-stability, subgen-v3.0.3-jni-stability, subgen-v3.0.4-fp32-audio-stability, subgen-v3.0.5-speed-engine, subgen-v3.0.6-hypnosis-essential-controls]
+    branches: [main, subgen-v3.0.1-diagnostic-apk, subgen-v3.0.2-stability, subgen-v3.0.3-jni-stability, subgen-v3.0.4-fp32-audio-stability, subgen-v3.0.5-speed-engine, subgen-v3.0.6-hypnosis-essential-controls, subgen-v3.0.7-adaptive-neural-speed]
   pull_request:
 jobs:
   android:
@@ -37,6 +37,7 @@ jobs:
           python3 scripts/check-fp32-stability.py
           python3 scripts/check-speed-engine.py
           python3 scripts/check-hypnosis-essentials.py
+          python3 scripts/check-adaptive-speed.py
           bash scripts/run-core-tests.sh
       - name: Native sherpa-onnx runtime and Kotlin JNI bridge
         run: |
@@ -62,26 +63,26 @@ jobs:
           if-no-files-found: error
 
       - name: Create exact source snapshot from this commit
-        run: git archive --format=zip HEAD -o "$RUNNER_TEMP/SubGen-Native-v3.0.6-Hypnosis-Essentials-Source.zip"
+        run: git archive --format=zip HEAD -o "$RUNNER_TEMP/SubGen-Native-v3.0.7-Adaptive-Speed-Source.zip"
       - name: Upload matching source snapshot
         uses: actions/upload-artifact@v4
         with:
-          name: SubGen-Native-v3.0.6-Hypnosis-Essentials-Source
-          path: ${{ runner.temp }}/SubGen-Native-v3.0.6-Hypnosis-Essentials-Source.zip
+          name: SubGen-Native-v3.0.7-Adaptive-Speed-Source
+          path: ${{ runner.temp }}/SubGen-Native-v3.0.7-Adaptive-Speed-Source.zip
           if-no-files-found: error
       - name: Publish installable diagnostic APK pre-release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/subgen-v3.0.6-hypnosis-essential-controls'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/subgen-v3.0.7-adaptive-neural-speed'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG='v3.0.6-hypnosis-essentials-test'
+          TAG='v3.0.7-adaptive-speed-test'
           APK='app/build/outputs/apk/debug/app-debug.apk'
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else
             gh release create "$TAG" "$APK" \
-              --title 'Sub Gen Native v3.0.6 Hypnosis Essentials Test' \
-              --notes 'Adds essential native hypnosis controls only: live script timeline, voice preview, 16–48k WAV export, mono/stereo, output gain, global peak ceiling, duration and WAV size. Real PCM render backing. Prior speed optimizations preserved; separate test install, device validation required.' \
+              --title 'Sub Gen Native v3.0.7 Adaptive Neural Speed Test' \
+              --notes 'Keeps essential native Hypnosis UI and FP32 Kokoro quality. Adds device-calibrated native 2/4-thread inference for long uncached renders, 1/2/4 warmup benchmark, better thermal fallback and real RTF/ETA telemetry. No device-speed claims until measured.' \
               --prerelease --target "$GITHUB_SHA"
           fi
