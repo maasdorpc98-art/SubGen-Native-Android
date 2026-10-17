@@ -4,7 +4,7 @@ android {
     namespace = "com.subgen.nativeapp"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.subgen.nativeapp"
+        applicationId = "com.subgen.nativeapp.studio"
         minSdk = 29
         targetSdk = 34
         versionCode = 2
