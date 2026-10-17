@@ -19,8 +19,10 @@ jobs:
           java-version: '17'
       - name: Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
       - name: Required Android platform
-        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'platform-tools'
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - name: Gradle 8.10.2
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -43,7 +45,7 @@ jobs:
       - name: Verify Android APK signature and arm64 runtime
         run: |
           test -s app/build/outputs/apk/debug/app-debug.apk
-          apksigner verify --verbose app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose app/build/outputs/apk/debug/app-debug.apk
           unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libsherpa-onnx-jni.so'
           sha256sum app/build/outputs/apk/debug/app-debug.apk
       - name: Upload installable APK
