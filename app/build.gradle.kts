@@ -8,7 +8,7 @@ android {
         minSdk = 29
         targetSdk = 34
         versionCode = 9
-        versionName = "3.0.9-thermal-runtime-speed"
+        versionName = "3.0.9-cache-speed-stable"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     buildTypes {
