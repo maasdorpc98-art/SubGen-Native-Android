@@ -7,8 +7,8 @@ android {
         applicationId = "com.subgen.nativeapp"
         minSdk = 29
         targetSdk = 34
-        versionCode = 1
-        versionName = "2.1-native-build-candidate"
+        versionCode = 2
+        versionName = "2.2-studio-restored"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     buildTypes {
