@@ -10,7 +10,7 @@ object ScriptTimeline {
                        val spokenSeconds:Double,val silenceSeconds:Double,
                        val totalSeconds:Double,val words:Int,val markers:List<String>,
                        val rows:List<Row>)
-    fun analyze(script:String,speed:Float=.84f,breathe:Double=5.0,paragraph:Double=3.0):Summary {
+    fun analyze(script:String,speed:Float=VoiceSpeed.DEFAULT,breathe:Double=5.0,paragraph:Double=3.0):Summary {
         val nodes=ScriptParser.parse(script,breathe,paragraph,maxSpeechChars=160)
         var whenAt=0.0;var silence=0.0;var speech=0.0;var spoken=0;var pauses=0;var sections=0;var words=0
         val markers=mutableListOf<String>();val rows=mutableListOf<Row>()
