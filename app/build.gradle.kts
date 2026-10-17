@@ -4,11 +4,11 @@ android {
     namespace = "com.subgen.nativeapp"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.subgen.nativeapp.original.jnistability"
+        applicationId = "com.subgen.nativeapp.original.fp32stability"
         minSdk = 29
         targetSdk = 34
-        versionCode = 3
-        versionName = "3.0.3-jni-stability-test"
+        versionCode = 4
+        versionName = "3.0.4-fp32-stability-test"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     buildTypes {
