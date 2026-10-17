@@ -70,10 +70,12 @@ class RenderService:Service() {
         val phrase="Take a slow breath. Let each breath feel calmer and easier as your shoulders relax."
         val speed=p.getFloat("speed",.84f)
         val results=mutableListOf<Pair<Int,Double>>()
-        for(threads in listOf(1,2,3)){
+        for(threads in listOf(1,2,4).filter{it<=Runtime.getRuntime().availableProcessors()}){
             if(cancelled.get())return
             update("Native performance test · $threads inference threads…")
             KokoroNative(installer,threads).use {tts->
+                tts.synthesize(phrase,sid,speed){cancelled.get()} // warm-up
+                if(cancelled.get())return
                 val start=SystemClock.elapsedRealtime()
                 val (samples,sr)=tts.synthesize(phrase,sid,speed){cancelled.get()}
                 val elapsed=(SystemClock.elapsedRealtime()-start)/1000.0
@@ -82,7 +84,7 @@ class RenderService:Service() {
             }
         }
         val best=results.minByOrNull{it.second}!!
-        p.edit().putInt("autotuned:threads",best.first).apply()
+        InferenceTuner.rememberBenchmark(this,best.first,best.second)
         Diagnostics.record("INFERENCE_BENCHMARK_WINNER","",org.json.JSONObject()
             .put("threads",best.first).put("rtf",best.second))
         p.edit().putInt("threads",best.first).putString("benchmark",results.joinToString(" · "){"${it.first} threads RTF ${"%.2f".format(it.second)}"}).apply()
@@ -155,8 +157,8 @@ class RenderService:Service() {
         val voice=prefs.getString("voice","SERENA")?:"SERENA"
         val sid=KokoroNative.voices[voice]?:3
         val speed=prefs.getFloat("speed",0.84f).coerceIn(.65f,1.2f)
-        // Stability mode: limit inference parallelism. User's selected setting remains stored for later.
-        val threads=InferenceTuner.threads(this)
+        // Native throughput is independent from speech speed and output WAV quality.
+        var threads=InferenceTuner.threads(this)
         Diagnostics.record("SPEED_ENGINE","FP32 + adaptive inference workers + cache-first pipeline")
         val name=prefs.getString("name","Hypnosis Session")?:"Hypnosis Session"
         val nodes=ScriptParser.parse(script,maxSpeechChars=160)
@@ -184,12 +186,18 @@ class RenderService:Service() {
         val installer=ModelInstaller(this)
         if(missing>0) {
             Diagnostics.stage("KOKORO_MODEL_INSTALL")
+            val installStarted=SystemClock.elapsedRealtime()
             installer.install(::update)
+            Diagnostics.record("KOKORO_ASSET_CHECK_COMPLETED","",org.json.JSONObject()
+                .put("elapsedMs",SystemClock.elapsedRealtime()-installStarted))
             if(cancelled.get()) {update("Stopped. Installed model retained.");return}
-            update("Loading Kokoro FP32 with $threads adaptive CPU workers…")
+            threads=InferenceTuner.autoTuneIfNeeded(this,installer,sid,speed,missing,{cancelled.get()},::update)
+            if(cancelled.get()){update("Calibration cancelled; saved blocks retained");return}
+            update("Loading Kokoro FP32 with $threads tuned CPU workers…")
         } else update("Cache hit · reusing all $speechCount speech blocks without loading Kokoro")
         var finished=0;var generated=0;var cacheHits=0;var generatedSamples=0L;var inferenceMs=0L
         val started=SystemClock.elapsedRealtime()
+        val initStarted=SystemClock.elapsedRealtime()
         Diagnostics.stage(if(missing>0)"KOKORO_SYNTHESIS" else "CACHE_ONLY_ASSEMBLY",
             org.json.JSONObject().put("speechBlocks",speechCount).put("threads",threads)
                 .put("cached",preflightHits))
@@ -219,14 +227,29 @@ class RenderService:Service() {
                 }
                 checkpointFiles[index]=clip
                 finished++
-                if(finished%6==0 || finished==speechCount)update("Speech $finished / $speechCount · reused $cacheHits · ${"%.1f".format((SystemClock.elapsedRealtime()-started)/1000.0)}s elapsed")
+                if(finished%6==0 || finished==speechCount){
+                    val averageMs=if(generated>0)inferenceMs.toDouble()/generated else 0.0
+                    val etaMin=averageMs*(speechCount-finished).coerceAtLeast(0)/60000.0
+                    val speechSec=generatedSamples/24000.0
+                    val rtf=if(speechSec>0)inferenceMs/1000.0/speechSec else 0.0
+                    update("Speech $finished/$speechCount · cached $cacheHits · approx ${"%.0f".format(etaMin)}m left · RTF ${"%.2f".format(rtf)}")
+                    if(finished%18==0 || finished==speechCount)Diagnostics.record("SPEECH_SPEED_CHECKPOINT","",org.json.JSONObject()
+                        .put("completed",finished).put("total",speechCount).put("reused",cacheHits)
+                        .put("workers",threads).put("rtf",rtf).put("etaMinutes",etaMin))
+                }
             }
         }
-        if(missing>0) KokoroNative(installer,threads).use {renderSpeech(it)}
-        else renderSpeech(null)
+        if(missing>0) KokoroNative(installer,threads).use {tts->
+            Diagnostics.record("KOKORO_ENGINE_LOAD_TIME","",org.json.JSONObject()
+                .put("elapsedMs",SystemClock.elapsedRealtime()-initStarted).put("workers",threads))
+            renderSpeech(tts)
+        } else renderSpeech(null)
         if(cancelled.get()){update("Paused with $finished / $speechCount blocks saved");return}
         check(finished==speechCount){"Not all speech blocks are ready"}
-        Diagnostics.record("SPEECH_GENERATION_COMPLETED","",org.json.JSONObject().put("generated",generated).put("reused",cacheHits).put("inferenceMs",inferenceMs))
+        Diagnostics.record("SPEECH_GENERATION_COMPLETED","",org.json.JSONObject()
+            .put("generated",generated).put("reused",cacheHits).put("inferenceMs",inferenceMs)
+            .put("workers",threads).put("newSpeechSeconds",generatedSamples/24000.0)
+            .put("rtf",if(generatedSamples>0)inferenceMs/1000.0/(generatedSamples/24000.0) else 0.0))
         update("Mixing WAV from disk, preserving exact pauses…")
         val path=StateStore.partialFile(this)
         Diagnostics.stage("HYPNOSIS_WAV_ASSEMBLY")
