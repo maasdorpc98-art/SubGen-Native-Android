@@ -36,15 +36,16 @@ class AdaptiveNeuralSession(private val assets:ModelInstaller, initialWorkers:In
             initialRtf=measure(engine)
             if(stop())return
             engine.close();released=true
-            trialEngine=KokoroNative(assets,2)
-            alternateRtf=measure(trialEngine)
+            val tested=KokoroNative(assets,2)
+            trialEngine=tested
+            alternateRtf=measure(tested)
             if(ThermalRecheckPolicy.preferTwo(initialRtf,alternateRtf)){
-                engine=trialEngine
+                engine=tested
                 trialEngine=null
                 workers=2
                 switched=true
             } else {
-                trialEngine.close();trialEngine=null
+                tested.close();trialEngine=null
                 engine=KokoroNative(assets,original)
             }
         } catch(e:Throwable) {
@@ -54,7 +55,8 @@ class AdaptiveNeuralSession(private val assets:ModelInstaller, initialWorkers:In
         } finally {
             Diagnostics.record("THERMAL_COMPARE_COMPLETED","",JSONObject()
                 .put("oldWorkers",original).put("newWorkers",workers)
-                .put("oldRtf",initialRtf).put("newRtf",alternateRtf)
+                .put("oldRtf",if(initialRtf.isFinite()) initialRtf else JSONObject.NULL)
+                .put("newRtf",if(alternateRtf.isFinite()) alternateRtf else JSONObject.NULL)
                 .put("heat",heat).put("changed",switched)
                 .put("elapsedMs",SystemClock.elapsedRealtime()-begin))
         }
