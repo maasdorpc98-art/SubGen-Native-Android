@@ -58,6 +58,7 @@ class MainActivity : Activity() {
     private var activeTab="studio"
     private var applyingPreset=false
     private var selectedPreset="custom"
+    private var refreshHyp: (() -> Unit)?=null
     private val originalPresets by lazy { org.json.JSONArray(assets.open("original-presets.json").bufferedReader().use{it.readText()}) }
     private val originalSelects by lazy { JSONObject(assets.open("original-selects.json").bufferedReader().use{it.readText()}) }
     private val mono=Typeface.create("monospace",Typeface.NORMAL)
@@ -177,7 +178,7 @@ class MainActivity : Activity() {
         tabHypnosis.setOnClickListener{showTab("hypnosis")}
         space(header,26)
     }
-    private fun showTab(name:String){activeTab=name;body.removeAllViews();slides.clear();checks.clear();selects.clear();sourceLabels.clear()
+    private fun showTab(name:String){activeTab=name;refreshHyp=null;body.removeAllViews();slides.clear();checks.clear();selects.clear();sourceLabels.clear()
         val onBg=cardShape(Color.rgb(52,26,34),Color.rgb(155,33,39),8)
         tabStudio.background=if(name=="studio")onBg else null
         tabHypnosis.background=if(name=="hypnosis")cardShape(Color.rgb(52,26,34),Color.rgb(155,33,39),8) else null
@@ -441,7 +442,7 @@ class MainActivity : Activity() {
         txt(b,"Original Kokoro neural voices · controlled pauses · WAV rendering.",11f,cool,gravity=Gravity.CENTER)
         space(b,10)
         action(b,"↗ USE HYPNOSIS WAV AS PRIMARY AFFIRMATION","aqua"){
-            val file=File(filesDir,"hypnosis-working.wav")
+            val file=File(filesDir,"hypnosis-final.wav")
             if(!file.exists())Toast.makeText(this,"Render Hypnosis WAV first",Toast.LENGTH_LONG).show()
             else {p.edit().putString("affirmNormal",file.absolutePath).apply();Toast.makeText(this,"Loaded Hypnosis WAV as Primary",Toast.LENGTH_SHORT).show()}
         }
@@ -460,19 +461,156 @@ class MainActivity : Activity() {
         val bar=SeekBar(this).apply{max=55;progress=((p.getFloat("speed",.84f)-.65f)*100).toInt().coerceIn(0,55);progressTintList=ColorStateList.valueOf(violet);thumbTintList=ColorStateList.valueOf(Color.rgb(173,147,250))}
         speed.addView(bar,params());bar.setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener{
             override fun onStartTrackingTouch(s:SeekBar){};override fun onStopTrackingTouch(s:SeekBar){}
-            override fun onProgressChanged(s:SeekBar,n:Int,user:Boolean){if(user)p.edit().putFloat("speed",.65f+n/100f).apply()}
+            override fun onProgressChanged(s:SeekBar,n:Int,user:Boolean){if(user){p.edit().putFloat("speed",.65f+n/100f).apply();refreshHyp?.invoke()}}
         })
         val pack=if(ModelInstaller(this).present())"OFFLINE VOICES INSTALLED" else "INSTALL OFFLINE VOICE PACK"
         action(session,pack,"aqua"){startAction(RenderService.ACTION_INSTALL)}
-        action(session,"GENERATE VOICE PREVIEW"){startAction(RenderService.ACTION_PREVIEW)}
-        action(session,"▶ PLAY VOICE PREVIEW"){playPreview()}
         action(session,"BENCHMARK · AUTO-SELECT 2 OR 4 THREADS"){startAction(RenderService.ACTION_BENCHMARK)}
         val editor=hypSection("02 — HYPNOSIS SCRIPT")
         txt(editor,"[SECTION] · [PAUSE: 5] · [SLOW] · [SOFT] · [WHISPER] · [NORMAL]",10f,cool,monoFont=true)
         val field=textEntry(editor,"Write or paste your hypnosis script","script",p.getString("script","")?:"")
         action(editor,"IMPORT SCRIPT .TXT"){val i=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="text/plain"};@Suppress("DEPRECATION")startActivityForResult(i,910)}
-        val output=hypSection("03 — OUTPUT / RENDER")
-        txt(output,"WAV EXPORT · 24 KHz · STEREO · EXACT TIMED PAUSES",10f,cool,monoFont=true)
+        val check=hypSection("03 — SCRIPT CHECK + TIMELINE")
+        val stats=txt(check,"Analysing script…",11f,Color.rgb(207,194,255),monoFont=true)
+        space(check,10)
+        val checks=txt(check,"",10f,cool,monoFont=true)
+        space(check,10)
+        val timeline=panel(check,fill=Color.rgb(17,24,32),border=Color.rgb(76,61,119),radius=11,padding=13,margin=5)
+        val previewLines=txt(timeline,"",10f,cool,monoFont=true)
+        action(check,"VIEW FULL SCRIPT TIMELINE") {
+            val summary=ScriptTimeline.analyze(field.text.toString(),p.getFloat("speed",.84f))
+            val detail=buildString {
+                append("Speech timing is estimated; pauses are exact.\n\n")
+                for(row in summary.rows) {
+                    append(ScriptTimeline.time(row.seconds))
+                    append("  ·  ");append(row.kind);append("  ·  ");append(row.detail);append("\n\n")
+                }
+            }
+            val scroll=ScrollView(this)
+            val bodyText=TextView(this).apply {
+                text=detail;textSize=12f;typeface=mono;setTextColor(bright);setPadding(d(17),d(15),d(17),d(20))
+            }
+            scroll.addView(bodyText)
+            AlertDialog.Builder(this).setTitle("Script Check + Timeline")
+                .setView(scroll).setPositiveButton("CLOSE",null).show()
+        }
+        val voicePreview=hypSection("04 — NEURAL VOICE PREVIEW")
+        txt(voicePreview,"Listen to the selected Kokoro voice before a full render. The preview uses your current voice and speech speed.",10f,cool,monoFont=true)
+        action(voicePreview,"▶ GENERATE SELECTED VOICE PREVIEW","aqua"){startAction(RenderService.ACTION_PREVIEW)}
+        action(voicePreview,"▶ PLAY GENERATED VOICE"){playPreview()}
+        val output=hypSection("05 — OUTPUT / RENDER")
+        txt(output,"PCM 16-BIT WAV · EXACT PAUSES · LOCAL PROCESSING",10f,cool,monoFont=true)
+        space(output,12)
+        var updateSummary:(()->Unit)?=null
+        txt(output,"OUTPUT SAMPLE RATE",10f,Color.rgb(190,177,255),monoFont=true,tracking=.12f)
+        val rates=OutputFormat.rates
+        val rateNames=arrayOf("16 kHz","22.05 kHz","24 kHz · Neural native","32 kHz","44.1 kHz","48 kHz")
+        val rateSelect=Spinner(this).apply {
+            adapter=ArrayAdapter(this@MainActivity,android.R.layout.simple_spinner_item,rateNames).apply {
+                setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            }
+            val n=rates.indexOf(p.getInt("hyp:sampleRate",24000))
+            setSelection(n.coerceAtLeast(0))
+            onItemSelectedListener=object:android.widget.AdapterView.OnItemSelectedListener{
+                override fun onNothingSelected(parent:android.widget.AdapterView<*>?){}
+                override fun onItemSelected(parent:android.widget.AdapterView<*>?,view:View?,position:Int,id:Long) {
+                    p.edit().putInt("hyp:sampleRate",rates[position]).apply()
+                    updateSummary?.invoke()
+                }
+            }
+        }
+        output.addView(rateSelect,params(d(46)))
+        space(output,12)
+        txt(output,"OUTPUT CHANNELS",10f,Color.rgb(190,177,255),monoFont=true,tracking=.12f)
+        val channelSelect=Spinner(this).apply {
+            adapter=ArrayAdapter(this@MainActivity,android.R.layout.simple_spinner_item,arrayOf("MONO · Smaller WAV","STEREO · Binaural compatible")).apply {
+                setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            }
+            setSelection(if(p.getInt("hyp:channels",2)==1)0 else 1)
+            onItemSelectedListener=object:android.widget.AdapterView.OnItemSelectedListener {
+                override fun onNothingSelected(parent:android.widget.AdapterView<*>?){}
+                override fun onItemSelected(parent:android.widget.AdapterView<*>?,view:View?,position:Int,id:Long) {
+                    p.edit().putInt("hyp:channels",if(position==0)1 else 2).apply()
+                    updateSummary?.invoke()
+                }
+            }
+        }
+        output.addView(channelSelect,params(d(46)))
+        space(output,12)
+        val volumeText=txt(output,"FINAL OUTPUT VOLUME",10f,Color.rgb(190,177,255),monoFont=true)
+        val volumeBar=SeekBar(this).apply {
+            max=420;progress=((p.getFloat("hyp:outputDb",0f)+30f)*10f).roundToInt().coerceIn(0,420)
+            progressTintList=ColorStateList.valueOf(violet)
+            thumbTintList=ColorStateList.valueOf(Color.rgb(182,158,255))
+        }
+        output.addView(volumeBar,params())
+        volumeBar.setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener {
+            override fun onStartTrackingTouch(s:SeekBar){}
+            override fun onStopTrackingTouch(s:SeekBar){}
+            override fun onProgressChanged(s:SeekBar,n:Int,user:Boolean) {
+                val db=n/10f-30f
+                volumeText.text=String.format(Locale.US,"FINAL OUTPUT VOLUME · %+.1f dB",db)
+                if(user)p.edit().putFloat("hyp:outputDb",db).apply()
+            }
+        })
+        volumeText.text=String.format(Locale.US,"FINAL OUTPUT VOLUME · %+.1f dB",p.getFloat("hyp:outputDb",0f))
+        val peakText=txt(output,"PEAK CEILING · -1.0 dBFS",10f,Color.rgb(190,177,255),monoFont=true)
+        val peakBar=SeekBar(this).apply {
+            max=120;progress=((p.getFloat("hyp:peakDb",-1f)+12f)*10f).roundToInt().coerceIn(0,120)
+            progressTintList=ColorStateList.valueOf(violet)
+            thumbTintList=ColorStateList.valueOf(Color.rgb(182,158,255))
+        }
+        output.addView(peakBar,params())
+        peakBar.setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener {
+            override fun onStartTrackingTouch(s:SeekBar){}
+            override fun onStopTrackingTouch(s:SeekBar){}
+            override fun onProgressChanged(s:SeekBar,n:Int,user:Boolean){
+                val db=n/10f-12f
+                peakText.text=String.format(Locale.US,"PEAK CEILING · %.1f dBFS",db)
+                if(user)p.edit().putFloat("hyp:peakDb",db).apply()
+            }
+        })
+        peakText.text=String.format(Locale.US,"PEAK CEILING · %.1f dBFS",p.getFloat("hyp:peakDb",-1f))
+        val info=panel(output,fill=Color.rgb(17,24,32),border=Color.rgb(73,68,107),padding=13,margin=10)
+        val estimated=txt(info,"ESTIMATED DURATION",10f,Color.rgb(190,177,255),monoFont=true)
+        space(info,8)
+        val size=txt(info,"ESTIMATED WAV SIZE",10f,Color.rgb(190,177,255),monoFont=true)
+        space(info,6)
+        val guidance=txt(info,"",10f,cool,monoFont=true)
+        updateSummary={
+            val summary=ScriptTimeline.analyze(field.text.toString(),p.getFloat("speed",.84f))
+            stats.text="SPOKEN BLOCKS  "+summary.speechBlocks+
+                "\nPAUSE BLOCKS  "+summary.pauseBlocks+
+                "\nTOTAL EXACT SILENCE  "+ScriptTimeline.time(summary.silenceSeconds)+
+                "\nWORDS  "+summary.words+
+                "\nESTIMATED SESSION  "+ScriptTimeline.time(summary.totalSeconds)
+            val markerNames=summary.markers.joinToString(" · ")
+            val hasMain=summary.markers.any { it.contains("SUGGEST",true) || it.contains("MAIN",true) }
+            val unknown=summary.rows.count{it.kind=="NOTICE"}
+            checks.text="SECTIONS  "+(if(markerNames.isBlank())"No named sections" else markerNames.take(240))+
+                "\nMAIN SUGGESTIONS  "+(if(hasMain)"✓ Marked" else "! No labelled section")+
+                "\nUNRECOGNISED TAGS  "+unknown+
+                "\nSpeech estimates may change after neural generation."
+            previewLines.text=summary.rows.take(9).joinToString("\n\n"){
+                ScriptTimeline.time(it.seconds)+"   "+it.kind+"   "+it.detail.take(58)
+            }.ifEmpty{"Add a script to see the timeline."}
+            val hz=p.getInt("hyp:sampleRate",24000)
+            val channels=p.getInt("hyp:channels",2)
+            val mb=ScriptTimeline.estimatedWavBytes(summary.totalSeconds,hz,channels)/1e6
+            estimated.text="ESTIMATED DURATION  ·  "+ScriptTimeline.time(summary.totalSeconds)
+            size.text=String.format(Locale.US,"ESTIMATED WAV SIZE  ·  %.1f MB",mb)
+            guidance.text=(if(channels==1 && p.getBoolean("binaural",false))
+                "Mono export omits binaural stereo separation.\n" else "")+
+                "24 kHz is Kokoro's original voice rate; higher rates do not add new speech detail. "+
+                "Output gain stays below the selected peak ceiling."
+        }
+        refreshHyp=updateSummary
+        field.addTextChangedListener(object:TextWatcher{
+            override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){}
+            override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){updateSummary?.invoke()}
+            override fun afterTextChanged(s:Editable?){}
+        })
+        updateSummary?.invoke()
         action(output,"RENDER HYPNOSIS WAV","primary"){startAction(RenderService.ACTION_RENDER)}
         action(output,"STOP RENDER · KEEP SAVED BLOCKS"){startAction(RenderService.ACTION_CANCEL)}
         action(output,"⬇ OPEN SAVED WAV","green"){openOutput()}
