@@ -196,6 +196,8 @@ class RenderService:Service() {
             update("Loading Kokoro FP32 with $threads tuned CPU workers…")
         } else update("Cache hit · reusing all $speechCount speech blocks without loading Kokoro")
         var finished=0;var generated=0;var cacheHits=0;var generatedSamples=0L;var inferenceMs=0L
+        val quartileMs=LongArray(4)
+        val quartileSamples=LongArray(4)
         val started=SystemClock.elapsedRealtime()
         val initStarted=SystemClock.elapsedRealtime()
         Diagnostics.stage(if(missing>0)"KOKORO_SYNTHESIS" else "CACHE_ONLY_ASSEMBLY",
