@@ -18,9 +18,10 @@ assert 'speechBlocks<60' in t
 assert 'listOf(2,4).filter' in t
 assert 'rememberBenchmark(context:Context' in t
 assert 'getString(KEY_MODEL' in t and 'Build.FINGERPRINT' in t
-assert 'if(free in 0..449) result=1' in t
-assert 'else if(thermal>=PowerManager.THERMAL_STATUS_MODERATE) result=minOf(result,2)' in t
+assert 'WorkerPolicy.choose(cores,saved,free,thermal' in t
+assert 'WorkerPolicy.winner(results)' in t
 assert 'KokoroNative(installer,worker).use' in t
+assert 'WorkerPolicy.choose(' in (src/'WorkerPolicy.kt').read_text()
 assert 'val started=SystemClock.elapsedRealtime()' in s
 assert 'generateWithConfigAndCallback(' not in k
 assert 'AudioQuality.examine' in k
