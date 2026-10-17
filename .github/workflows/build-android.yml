@@ -2,7 +2,7 @@ name: Native Android APK
 on:
   workflow_dispatch:
   push:
-    branches: [main, subgen-v3.0.1-diagnostic-apk, subgen-v3.0.2-stability, subgen-v3.0.3-jni-stability, subgen-v3.0.4-fp32-audio-stability]
+    branches: [main, subgen-v3.0.1-diagnostic-apk, subgen-v3.0.2-stability, subgen-v3.0.3-jni-stability, subgen-v3.0.4-fp32-audio-stability, subgen-v3.0.5-speed-engine]
   pull_request:
 jobs:
   android:
@@ -35,6 +35,7 @@ jobs:
           python3 scripts/check-stability.py
           python3 scripts/check-jni-stability.py
           python3 scripts/check-fp32-stability.py
+          python3 scripts/check-speed-engine.py
           bash scripts/run-core-tests.sh
       - name: Native sherpa-onnx runtime and Kotlin JNI bridge
         run: |
@@ -60,26 +61,26 @@ jobs:
           if-no-files-found: error
 
       - name: Create exact source snapshot from this commit
-        run: git archive --format=zip HEAD -o "$RUNNER_TEMP/SubGen-Native-v3.0.4-FP32-Stability-Source.zip"
+        run: git archive --format=zip HEAD -o "$RUNNER_TEMP/SubGen-Native-v3.0.5-Speed-Source.zip"
       - name: Upload matching source snapshot
         uses: actions/upload-artifact@v4
         with:
-          name: SubGen-Native-v3.0.4-FP32-Stability-Source
-          path: ${{ runner.temp }}/SubGen-Native-v3.0.4-FP32-Stability-Source.zip
+          name: SubGen-Native-v3.0.5-Speed-Source
+          path: ${{ runner.temp }}/SubGen-Native-v3.0.5-Speed-Source.zip
           if-no-files-found: error
       - name: Publish installable diagnostic APK pre-release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/subgen-v3.0.4-fp32-audio-stability'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/subgen-v3.0.5-speed-engine'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG='v3.0.4-fp32-stability-test'
+          TAG='v3.0.5-speed-test'
           APK='app/build/outputs/apk/debug/app-debug.apk'
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else
             gh release create "$TAG" "$APK" \
-              --title 'Sub Gen Native v3.0.4 FP32 Audio Stability Test' \
-              --notes 'Experimental Kokoro FP32 non-quantized model instead of int8; strict NaN/Inf/rail validation, callback-free JNI generation, and isolated checkpoint cache. Installs separately. First-time model download is larger; device validation required.' \
+              --title 'Sub Gen Native v3.0.5 Native Speed Engine Test' \
+              --notes 'Native speed engine: cache-first rendering avoids neural model loading when speech WAVs exist, adaptive inference workers, buffered WAV PCM/silence and binaural output, resumable FP32 asset downloads. Same quality validation and original UI. Device benchmarks still required.' \
               --prerelease --target "$GITHUB_SHA"
           fi

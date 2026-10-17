@@ -17,7 +17,7 @@ assert 'KOKORO_AUDIO_REJECTED' in engine
 assert 'KOKORO_AUDIO_ACCEPTED' in engine
 assert 'generateWithConfigAndCallback(' not in engine
 assert 'native-kokoro-v1_0-fp32-validated' in service
-assert 'val threads=1' in service
+assert 'InferenceTuner.threads(this)' in service
 assert 'nanCount' in quality and 'infiniteCount' in quality and 'longestRailRun' in quality
 assert 'kotlinc "$K/AudioQuality.kt" scripts/test_audio_quality.kt' in (root/'scripts/run-core-tests.sh').read_text()
 print('PASS: independent FP32 model, separate cache, no JNI callback, valid audio quality gates')

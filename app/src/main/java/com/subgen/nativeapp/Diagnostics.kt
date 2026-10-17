@@ -119,13 +119,14 @@ object Diagnostics {
     }
     fun stage(name: String, data: JSONObject = JSONObject()) { phase = name.take(100); record("STAGE", phase, data) }
     /** Synchronous fsync before potentially fatal JNI invocation. No speech text is logged. */
-    fun beforeNative(name: String, metadata: JSONObject = JSONObject()) {
+    fun beforeNative(name: String, metadata: JSONObject = JSONObject(), durable: Boolean = true) {
         phase = name.take(100)
         if (ctx == null) return
         val entry = event("BEFORE_NATIVE_CALL", phase, metadata)
         try {
             synchronized(guard) { ring.addLast(entry); while (ring.size > 160) ring.removeFirst() }
-            persist(entry, true)
+            if(durable) persist(entry, true)
+            else io.execute { persist(entry, false) }
         } catch (error: Throwable) { Log.w("SubGenDiagnostics", "Native marker failed", error) }
     }
     fun progress(message: String) {

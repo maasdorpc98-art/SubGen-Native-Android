@@ -14,7 +14,7 @@ assert 'ACTION_RENDER->runJob()' in service
 assert 'startForegroundService(Intent(this,RenderService::class.java))' not in activity
 assert 'startAction(RenderService.ACTION_RENDER)' in activity
 assert 'maxSpeechChars=160' in service
-assert 'val threads=1' in service
+assert 'InferenceTuner.threads(this)' in service
 assert 'KOKORO_BLOCK_START' in service and 'KOKORO_BLOCK_SUCCESS' in service
 assert 'KOKORO_ENGINE_CREATE' in kokoro and 'KOKORO_ENGINE_READY' in kokoro
 assert 'KOKORO_GENERATE' in kokoro
