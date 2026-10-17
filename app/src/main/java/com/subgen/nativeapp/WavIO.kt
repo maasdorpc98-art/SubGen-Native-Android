@@ -25,10 +25,23 @@ object WavIO {
     fun floatToS16(x:Float):Int=(x.coerceIn(-1f,1f)*32767f).roundToInt().coerceIn(-32768,32767)
     fun writeMono(file:File,samples:FloatArray,rate:Int) {
         val tmp=File(file.parentFile,file.name+".tmp")
-        FileOutputStream(tmp).buffered(65536).use{out->writeHeader(out,samples.size.toLong(),rate,1)
-            for(s in samples)le16(floatToS16(s),out)
+        FileOutputStream(tmp).buffered(65536).use { out ->
+            writeHeader(out,samples.size.toLong(),rate,1)
+            val pcm=ByteArray(65536)
+            var i=0
+            while(i<samples.size) {
+                val count=min(32768,samples.size-i)
+                for(k in 0 until count) {
+                    val pcmValue=floatToS16(samples[i+k])
+                    pcm[2*k]=(pcmValue and 255).toByte()
+                    pcm[2*k+1]=(pcmValue ushr 8).toByte()
+                }
+                out.write(pcm,0,count*2)
+                i+=count
+            }
         }
-        if(file.exists())file.delete();require(tmp.renameTo(file)){"Cannot publish speech checkpoint"}
+        if(file.exists())file.delete()
+        require(tmp.renameTo(file)){"Cannot publish speech checkpoint"}
     }
     data class Clip(val file:File,val rate:Int,val frames:Long){
         fun open():FileInputStream{val f=FileInputStream(file);f.channel.position(44);return f}
@@ -49,34 +62,126 @@ object WavIO {
         binOn:Boolean=false,centerHz:Double=240.0,beatHz:Double=6.0,beatGain:Double=0.008):Double{
         require(nodes.size==checkpoints.size)
         val sr=24000
+        // Open and validate headers once, not repeatedly for every pass.
+        val clips=arrayOfNulls<Clip>(nodes.size)
         var frames=0L
-        for(i in nodes.indices){when(val n=nodes[i]){
-            is ScriptNode.Pause->frames+= (n.seconds*sr).roundToLong()
-            is ScriptNode.Speech->{val clip=loadMono(checkpoints[i]?:error("Missing checkpoint $i"));require(clip.rate==sr){"Expected 24kHz Kokoro output"};frames+=clip.frames}
-            else->Unit
-        }}
-        val tmp=File(dest.parentFile,dest.name+".partial")
-        FileOutputStream(tmp).buffered(65536).use{out->writeHeader(out,frames,sr,2)
-            var frame=0L
-            fun emit(mono:Int){
-                val x=mono/32768.0
-                val left= if(binOn) (x+sin(2*PI*(centerHz-beatHz/2)*frame/sr)*beatGain) else x
-                val right= if(binOn) (x+sin(2*PI*(centerHz+beatHz/2)*frame/sr)*beatGain) else x
-                le16(floatToS16(left.toFloat()),out);le16(floatToS16(right.toFloat()),out);frame++
+        for(i in nodes.indices) when(val node=nodes[i]) {
+            is ScriptNode.Pause -> frames+=(node.seconds*sr).roundToLong()
+            is ScriptNode.Speech -> {
+                val clip=loadMono(checkpoints[i]?:error("Missing checkpoint $i"))
+                require(clip.rate==sr){"Expected 24kHz Kokoro output"}
+                clips[i]=clip
+                frames+=clip.frames
             }
-            for(i in nodes.indices){when(val node=nodes[i]){
-                is ScriptNode.Pause->repeat((node.seconds*sr).roundToInt()){emit(0)}
-                is ScriptNode.Speech->loadMono(checkpoints[i]!!).open().buffered(65536).use{input->
-                    val buffer=ByteArray(32768);var remaining=loadMono(checkpoints[i]!!).frames*2
-                    while(remaining>0){val n=input.read(buffer,0,min(buffer.size.toLong(),remaining).toInt());if(n<=0)error("Truncated checkpoint");require(n%2==0)
-                        for(pos in 0 until n step 2){val x=((buffer[pos].toInt() and 255) or (buffer[pos+1].toInt() shl 8)).toShort().toInt();emit(x)}
-                        remaining-=n
+            else -> Unit
+        }
+        val tmp=File(dest.parentFile,dest.name+".partial")
+        FileOutputStream(tmp).buffered(65536).use { out ->
+            writeHeader(out,frames,sr,2)
+            val inputBytes=ByteArray(32768)
+            val outputBytes=ByteArray(65536)
+            val silenceBytes=ByteArray(65536)
+            var frame=0L
+            // Binaural math advances by stable oscillator recurrence rather than
+            // calling sin() twice per 24 kHz sample. Re-anchor every 4096 frames.
+            val leftHz=centerHz-beatHz/2.0
+            val rightHz=centerHz+beatHz/2.0
+            val stepL=2.0*PI*leftHz/sr
+            val stepR=2.0*PI*rightHz/sr
+            val stepSinL=sin(stepL);val stepCosL=cos(stepL)
+            val stepSinR=sin(stepR);val stepCosR=cos(stepR)
+            var sinL=0.0;var cosL=1.0
+            var sinR=0.0;var cosR=1.0
+            var pending=0
+            fun flush() {
+                if(pending>0){out.write(outputBytes,0,pending);pending=0}
+            }
+            fun appendWithBinaural(sample:Int) {
+                if(frame%4096L==0L){
+                    val phaseL=2.0*PI*leftHz*frame/sr
+                    val phaseR=2.0*PI*rightHz*frame/sr
+                    sinL=sin(phaseL);cosL=cos(phaseL)
+                    sinR=sin(phaseR);cosR=cos(phaseR)
+                }
+                val centered=sample/32768.0
+                val left=floatToS16((centered+sinL*beatGain).toFloat())
+                val right=floatToS16((centered+sinR*beatGain).toFloat())
+                outputBytes[pending++]=(left and 255).toByte()
+                outputBytes[pending++]=(left ushr 8).toByte()
+                outputBytes[pending++]=(right and 255).toByte()
+                outputBytes[pending++]=(right ushr 8).toByte()
+                if(pending==outputBytes.size)flush()
+                val nextL=sinL*stepCosL+cosL*stepSinL
+                cosL=cosL*stepCosL-sinL*stepSinL
+                sinL=nextL
+                val nextR=sinR*stepCosR+cosR*stepSinR
+                cosR=cosR*stepCosR-sinR*stepSinR
+                sinR=nextR
+                frame++
+            }
+            fun addPause(length:Long) {
+                if(binOn){
+                    var remaining=length
+                    while(remaining>0){appendWithBinaural(0);remaining--}
+                } else {
+                    var remaining=length
+                    while(remaining>0){
+                        val take=min(remaining,16384L).toInt()
+                        out.write(silenceBytes,0,take*4)
+                        frame+=take
+                        remaining-=take
                     }
                 }
-                else->Unit
-            }}
+            }
+            for(i in nodes.indices) when(val node=nodes[i]){
+                is ScriptNode.Pause -> addPause((node.seconds*sr).roundToLong())
+                is ScriptNode.Speech -> {
+                    val clip=clips[i]?:error("Missing validated clip")
+                    clip.open().buffered(65536).use { input ->
+                        var remaining=clip.frames
+                        while(remaining>0){
+                            val count=min(remaining,16384L).toInt()
+                            val length=count*2
+                            var read=0
+                            while(read<length){
+                                val size=input.read(inputBytes,read,length-read)
+                                require(size>0){"Truncated checkpoint"}
+                                read+=size
+                            }
+                            if(binOn) {
+                                for(k in 0 until count){
+                                    val p=k*2
+                                    val sample=((inputBytes[p].toInt() and 255) or
+                                        ((inputBytes[p+1].toInt() and 255) shl 8)).toShort().toInt()
+                                    appendWithBinaural(sample)
+                                }
+                            } else {
+                                for(k in 0 until count) {
+                                    val p=k*2
+                                    val sample=((inputBytes[p].toInt() and 255) or
+                                        ((inputBytes[p+1].toInt() and 255) shl 8)).toShort().toInt()
+                                    // Preserve the legacy 32767/32768 scaling exactly.
+                                    val pcm=floatToS16((sample/32768.0).toFloat())
+                                    val q=k*4
+                                    val lo=(pcm and 255).toByte()
+                                    val hi=(pcm ushr 8).toByte()
+                                    outputBytes[q]=lo;outputBytes[q+1]=hi
+                                    outputBytes[q+2]=lo;outputBytes[q+3]=hi
+                                }
+                                out.write(outputBytes,0,count*4)
+                                frame+=count
+                            }
+                            remaining-=count
+                        }
+                    }
+                }
+                else -> Unit
+            }
+            flush()
+            check(frame==frames){"WAV frame mismatch: $frame versus $frames"}
         }
-        if(dest.exists())dest.delete();require(tmp.renameTo(dest)){"Cannot publish final WAV"}
+        if(dest.exists())dest.delete()
+        require(tmp.renameTo(dest)){"Cannot publish final WAV"}
         return frames.toDouble()/sr
     }
     fun saveToDownloads(context:Context,source:File,name:String):android.net.Uri{
