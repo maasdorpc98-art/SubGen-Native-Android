@@ -2,7 +2,7 @@ name: Native Android APK
 on:
   workflow_dispatch:
   push:
-    branches: [main, subgen-v3.0.1-diagnostic-apk]
+    branches: [main, subgen-v3.0.1-diagnostic-apk, subgen-v3.0.2-stability]
   pull_request:
 jobs:
   android:
@@ -32,6 +32,7 @@ jobs:
           python3 scripts/check-source.py
           python3 scripts/check-studio-parity.py
           python3 scripts/check-diagnostics.py
+          python3 scripts/check-stability.py
           bash scripts/run-core-tests.sh
       - name: Native sherpa-onnx runtime and Kotlin JNI bridge
         run: |
@@ -57,26 +58,26 @@ jobs:
           if-no-files-found: error
 
       - name: Create exact source snapshot from this commit
-        run: git archive --format=zip HEAD -o "$RUNNER_TEMP/SubGen-Native-v3.0.1-Diagnostic-Source.zip"
+        run: git archive --format=zip HEAD -o "$RUNNER_TEMP/SubGen-Native-v3.0.2-Stability-Source.zip"
       - name: Upload matching source snapshot
         uses: actions/upload-artifact@v4
         with:
-          name: SubGen-Native-v3.0.1-Diagnostic-Source
-          path: ${{ runner.temp }}/SubGen-Native-v3.0.1-Diagnostic-Source.zip
+          name: SubGen-Native-v3.0.2-Stability-Source
+          path: ${{ runner.temp }}/SubGen-Native-v3.0.2-Stability-Source.zip
           if-no-files-found: error
       - name: Publish installable diagnostic APK pre-release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/subgen-v3.0.1-diagnostic-apk'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/subgen-v3.0.2-stability'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG='v3.0.1-diagnostics-test'
+          TAG='v3.0.2-stability-test'
           APK='app/build/outputs/apk/debug/app-debug.apk'
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else
             gh release create "$TAG" "$APK" \
-              --title 'Sub Gen Native v3.0.1 Diagnostic Test' \
-              --notes 'Diagnostic test APK. Installs alongside v3.0. Export reports through Subliminal Diagnostics. Not device validated.' \
+              --title 'Sub Gen Native v3.0.2 Stability Test' \
+              --notes 'Stability-focused native Android test APK. Prevents automatic crash restarts; bounded Kokoro inference; Android exit diagnostics. Installs separately. Not yet device-validated.' \
               --prerelease --target "$GITHUB_SHA"
           fi

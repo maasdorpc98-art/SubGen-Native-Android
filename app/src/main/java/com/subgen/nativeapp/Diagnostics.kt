@@ -1,6 +1,7 @@
 package com.subgen.nativeapp
 
 import android.app.*
+import android.app.ApplicationExitInfo
 import android.content.Context
 import android.os.*
 import android.util.Log
@@ -41,7 +42,39 @@ object Diagnostics {
         val unfinished = prefs.getString("active-job", "none") ?: "none"
         prefs.edit().putString("active-job", "none").commit()
         record("PROCESS_STARTED")
-        if (unfinished != "none") record("PREVIOUS_JOB_INTERRUPTED", unfinished)
+        if (unfinished != "none") {
+            record("PREVIOUS_JOB_INTERRUPTED", unfinished)
+            // An interrupted native render must NEVER be resumed without an explicit tap.
+            StateStore.active(app, false)
+            StateStore.status(app, "Previous render interrupted. Reopen diagnostics before retrying.")
+            if (Build.VERSION.SDK_INT >= 30) {
+                try {
+                    val am = app.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                    val started = prefs.getLong("lastJobStartedMs", 0L)
+                    val exit = am.getHistoricalProcessExitReasons(app.packageName, 0, 12)
+                        .filter { it.timestamp >= started - 5000L && started > 0L }
+                        .maxByOrNull { it.timestamp }
+                    if (exit != null) {
+                        val reason = when (exit.reason) {
+                            ApplicationExitInfo.REASON_CRASH_NATIVE -> "NATIVE_CRASH"
+                            ApplicationExitInfo.REASON_CRASH -> "JAVA_CRASH"
+                            ApplicationExitInfo.REASON_LOW_MEMORY -> "LOW_MEMORY_KILL"
+                            ApplicationExitInfo.REASON_ANR -> "APP_NOT_RESPONDING"
+                            ApplicationExitInfo.REASON_SIGNALED -> "SIGNALED"
+                            ApplicationExitInfo.REASON_USER_REQUESTED -> "USER_REQUESTED"
+                            ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE -> "EXCESSIVE_RESOURCES"
+                            else -> "OTHER_" + exit.reason
+                        }
+                        record("ANDROID_PREVIOUS_PROCESS_EXIT", reason,
+                            JSONObject().put("reasonCode", exit.reason).put("status", exit.status)
+                                .put("timestampMs", exit.timestamp).put("pssKiB", exit.pss)
+                                .put("rssKiB", exit.rss).put("importance", exit.importance))
+                    }
+                } catch (error: Throwable) {
+                    record("ANDROID_EXIT_INFO_UNAVAILABLE", error.javaClass.simpleName)
+                }
+            }
+        }
         val oldHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
             if (fatal.compareAndSet(false, true)) {
@@ -77,13 +110,24 @@ object Diagnostics {
     fun interaction(control: String) { if (control != lastControl) { lastControl = control.take(90); record("CONTROL_INTERACTION", lastControl) } }
     fun startJob(kind: String, metadata: JSONObject = JSONObject()) {
         job = kind.take(80); phase = "starting"
-        ctx?.getSharedPreferences(PREF, Context.MODE_PRIVATE)?.edit()?.putString("active-job", job)?.commit()
+        ctx?.getSharedPreferences(PREF, Context.MODE_PRIVATE)?.edit()
+            ?.putString("active-job", job)?.putLong("lastJobStartedMs", System.currentTimeMillis())?.commit()
         record("JOB_STARTED", job, metadata)
         val data = resources()
         if (data.optBoolean("systemMemoryLow")) record("LOW_SYSTEM_MEMORY_WARNING", "", data)
         if (data.optLong("privateStorageFreeMiB", 9999) < 250) record("LOW_STORAGE_WARNING", "", data)
     }
     fun stage(name: String, data: JSONObject = JSONObject()) { phase = name.take(100); record("STAGE", phase, data) }
+    /** Synchronous fsync before potentially fatal JNI invocation. No speech text is logged. */
+    fun beforeNative(name: String, metadata: JSONObject = JSONObject()) {
+        phase = name.take(100)
+        if (ctx == null) return
+        val entry = event("BEFORE_NATIVE_CALL", phase, metadata)
+        try {
+            synchronized(guard) { ring.addLast(entry); while (ring.size > 160) ring.removeFirst() }
+            persist(entry, true)
+        } catch (error: Throwable) { Log.w("SubGenDiagnostics", "Native marker failed", error) }
+    }
     fun progress(message: String) {
         val label = when {
             message.startsWith("Decoding") -> "decoding"
@@ -173,7 +217,8 @@ object Diagnostics {
         val leads = JSONArray()
         if ("FATAL_UNCAUGHT_EXCEPTION" in kinds) leads.put("Inspect FATAL_UNCAUGHT_EXCEPTION stack trace for the originating app source line.")
         if ("JOB_FAILED" in kinds) leads.put("Review STAGE preceding JOB_FAILED and the stack trace.")
-        if ("PREVIOUS_JOB_INTERRUPTED" in kinds) leads.put("The prior render was interrupted; check Android logcat for native crash or OS termination.")
+        if ("PREVIOUS_JOB_INTERRUPTED" in kinds) leads.put("Render was interrupted; app now waits for manual retry. Check Android process-exit reason.")
+        if ("ANDROID_PREVIOUS_PROCESS_EXIT" in kinds) leads.put("Check ANDROID_PREVIOUS_PROCESS_EXIT reasonCode for native crash, OS kill or ANR.")
         if ("SUSPECTED_UI_STALL" in kinds) leads.put("Inspect last controls and work on the main thread before the stall.")
         if ("LOW_STORAGE_WARNING" in kinds || "LOW_OUTPUT_SPACE_WARNING" in kinds) leads.put("Check free storage before output.")
         if (leads.length() == 0) leads.put("Reproduce the crash, reopen and export diagnostics.")

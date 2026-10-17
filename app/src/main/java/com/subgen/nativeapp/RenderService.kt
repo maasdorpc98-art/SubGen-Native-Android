@@ -25,7 +25,14 @@ class RenderService:Service() {
     override fun onBind(i:Intent?):IBinder?=null
     override fun onCreate(){super.onCreate();createChannel()}
     override fun onStartCommand(intent:Intent?,flags:Int,startId:Int):Int {
-        if(intent?.action==ACTION_CANCEL){if(busy.get()){cancelled.set(true);update("Stopping at safe checkpoint…")}else stopSelf();return START_NOT_STICKY}
+        // Android must not automatically replay a failed native inference after process death.
+        val request=intent?.action
+        if(request == null || request !in setOf(ACTION_RENDER,ACTION_INSTALL,ACTION_BENCHMARK,ACTION_PREVIEW,ACTION_SUBLIMINAL,ACTION_CANCEL)) {
+            Diagnostics.record("IGNORED_SERVICE_RESTART", "No explicit valid user-initiated action")
+            stopSelfResult(startId)
+            return START_NOT_STICKY
+        }
+        if(request==ACTION_CANCEL){if(busy.get()){cancelled.set(true);update("Stopping at safe checkpoint…")}else stopSelf();return START_NOT_STICKY}
         if(busy.compareAndSet(false,true)){
             cancelled.set(false)
             // Foreground promotion happens before doing any work, including downloading model assets.
@@ -36,12 +43,12 @@ class RenderService:Service() {
                 val started=SystemClock.elapsedRealtime()
                 var outcome="success"
                 Diagnostics.startJob(intent?.action ?: "hypnosis-render")
-                try {acquireWake();when(intent?.action){ACTION_INSTALL->installOnly();ACTION_SUBLIMINAL->runSubliminal();ACTION_BENCHMARK->benchmark();ACTION_PREVIEW->previewVoice();else->runJob()}}
+                try {acquireWake();when(intent?.action){ACTION_INSTALL->installOnly();ACTION_SUBLIMINAL->runSubliminal();ACTION_BENCHMARK->benchmark();ACTION_PREVIEW->previewVoice();ACTION_RENDER->runJob();else->error("Unsupported action")}}
                 catch(t:Throwable){outcome="failed";Diagnostics.failure("JOB_FAILED",t);update("Stopped: ${t.message?:t.javaClass.simpleName}")}
                 finally {Diagnostics.finishJob(if(cancelled.get())"cancelled" else outcome,SystemClock.elapsedRealtime()-started);StateStore.active(this,false);releaseWake();busy.set(false);stopForeground(STOP_FOREGROUND_REMOVE);stopSelfResult(startId)}
             }
         }
-        return START_STICKY
+        return START_NOT_STICKY
     }
     private fun installOnly(){Diagnostics.stage("MODEL_INSTALL");ModelInstaller(this).install(::update)}
     private fun previewVoice(){
@@ -145,9 +152,11 @@ class RenderService:Service() {
         val voice=prefs.getString("voice","SERENA")?:"SERENA"
         val sid=KokoroNative.voices[voice]?:3
         val speed=prefs.getFloat("speed",0.84f).coerceIn(.65f,1.2f)
-        val threads=prefs.getInt("threads",2).coerceIn(1,4)
+        // Stability mode: limit inference parallelism. User's selected setting remains stored for later.
+        val threads=1
+        Diagnostics.record("STABILITY_MODE", "Single CPU thread and bounded speech blocks")
         val name=prefs.getString("name","Hypnosis Session")?:"Hypnosis Session"
-        val nodes=ScriptParser.parse(script)
+        val nodes=ScriptParser.parse(script,maxSpeechChars=160)
         val speechCount=nodes.count{it is ScriptNode.Speech}
         require(speechCount>0){"Script contains no spoken text"}
         val checkpointFiles=MutableList<File?>(nodes.size){null}
@@ -158,7 +167,7 @@ class RenderService:Service() {
         update("Loading native Kokoro inference (${threads} CPU threads)…")
         var finished=0;var generated=0;var cacheHits=0;var generatedSamples=0L;var inferenceMs=0L
         val started=SystemClock.elapsedRealtime()
-        Diagnostics.stage("KOKORO_SYNTHESIS")
+        Diagnostics.stage("KOKORO_SYNTHESIS",org.json.JSONObject().put("speechBlocks",speechCount).put("threads",threads))
         KokoroNative(installer,threads).use { tts->
             nodes.forEachIndexed{index,n->
                 if(cancelled.get()){update("Stopped after $finished / $speechCount blocks. Saved blocks retained.");return}
@@ -171,7 +180,13 @@ class RenderService:Service() {
                     val deliverySpeed=when(n.delivery){"SLOW"->.82f;"SOFT"->.94f;"WHISPER"->.90f;else->1f}
                     update("Generating ${finished+1} / $speechCount · $voice · saved $finished")
                     val t0=SystemClock.elapsedRealtime()
+                    Diagnostics.beforeNative("KOKORO_BLOCK_START",org.json.JSONObject()
+                        .put("block",finished+1).put("speechBlocks",speechCount)
+                        .put("chars",n.text.length).put("delivery",n.delivery))
                     val (samples,sr)=tts.synthesize(n.text,sid,speed*deliverySpeed){cancelled.get()}
+                    Diagnostics.record("KOKORO_BLOCK_SUCCESS", "",
+                        org.json.JSONObject().put("block",finished+1).put("samples",samples.size)
+                            .put("renderMs",SystemClock.elapsedRealtime()-t0))
                     inferenceMs+=SystemClock.elapsedRealtime()-t0;generatedSamples+=samples.size
                     if(cancelled.get()){update("Stopped after $finished completed blocks");return}
                     WavIO.writeMono(clip,samples,sr)
@@ -210,5 +225,5 @@ class RenderService:Service() {
     private fun acquireWake(){wakeLock=(getSystemService(POWER_SERVICE) as PowerManager).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,"SubGen:HypnosisRender").apply{setReferenceCounted(false);acquire(5*60*60*1000L)}}
     private fun releaseWake(){if(wakeLock?.isHeld==true)wakeLock?.release();wakeLock=null}
     override fun onDestroy(){cancelled.set(true);releaseWake();executor.shutdown();super.onDestroy()}
-    companion object{const val ACTION_CANCEL="com.subgen.nativeapp.CANCEL";const val ACTION_INSTALL="com.subgen.nativeapp.INSTALL";const val ACTION_BENCHMARK="com.subgen.nativeapp.BENCHMARK";const val ACTION_PREVIEW="com.subgen.nativeapp.PREVIEW";const val ACTION_SUBLIMINAL="com.subgen.nativeapp.SUBLIMINAL";const val CHANNEL="subgen-hypnosis";const val ID=9021}
+    companion object{const val ACTION_RENDER="com.subgen.nativeapp.RENDER";const val ACTION_CANCEL="com.subgen.nativeapp.CANCEL";const val ACTION_INSTALL="com.subgen.nativeapp.INSTALL";const val ACTION_BENCHMARK="com.subgen.nativeapp.BENCHMARK";const val ACTION_PREVIEW="com.subgen.nativeapp.PREVIEW";const val ACTION_SUBLIMINAL="com.subgen.nativeapp.SUBLIMINAL";const val CHANNEL="subgen-hypnosis";const val ID=9021}
 }

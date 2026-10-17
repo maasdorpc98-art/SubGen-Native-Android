@@ -119,7 +119,7 @@ class MainActivity : Activity() {
         body=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
         column.addView(body,params())
         showTab(if(savedInstanceState!=null)savedInstanceState.getString("tab")?:"studio" else "studio")
-        if(StateStore.active(this))runCatching{startForegroundService(Intent(this,RenderService::class.java))}
+        // No automatic render restart: on a process death, preserve checkpoints and wait for explicit user input.
         handler.post(object:Runnable{override fun run(){if(!isFinishing){refreshStatus();handler.postDelayed(this,1200)}}})
     }
     override fun onResume(){super.onResume();Diagnostics.setForeground(true)}
@@ -473,7 +473,7 @@ class MainActivity : Activity() {
         action(editor,"IMPORT SCRIPT .TXT"){val i=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="text/plain"};@Suppress("DEPRECATION")startActivityForResult(i,910)}
         val output=hypSection("03 — OUTPUT / RENDER")
         txt(output,"WAV EXPORT · 24 KHz · STEREO · EXACT TIMED PAUSES",10f,cool,monoFont=true)
-        action(output,"RENDER HYPNOSIS WAV","primary"){startAction(null)}
+        action(output,"RENDER HYPNOSIS WAV","primary"){startAction(RenderService.ACTION_RENDER)}
         action(output,"STOP RENDER · KEEP SAVED BLOCKS"){startAction(RenderService.ACTION_CANCEL)}
         action(output,"⬇ OPEN SAVED WAV","green"){openOutput()}
         status=txt(output,"Native Kokoro · Ready",10f,cool,monoFont=true)
@@ -489,7 +489,7 @@ class MainActivity : Activity() {
         val player=android.media.MediaPlayer().apply{setDataSource(f.absolutePath);setOnCompletionListener{it.release()};prepare();start()}
     }.onFailure{Toast.makeText(this,it.message,Toast.LENGTH_LONG).show()}}
     private fun startAction(action:String?){runCatching{
-        val i=Intent(this,RenderService::class.java);if(action!=null)i.action=action
+        val i=Intent(this,RenderService::class.java).apply{this.action=action ?: RenderService.ACTION_RENDER}
         if(action==RenderService.ACTION_CANCEL)startService(i) else startForegroundService(i)
         Toast.makeText(this,"Processing in native Android",Toast.LENGTH_SHORT).show()
     }.onFailure{Toast.makeText(this,"Cannot start: ${it.message}",Toast.LENGTH_LONG).show()}}
