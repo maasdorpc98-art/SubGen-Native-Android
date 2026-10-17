@@ -16,3 +16,5 @@ kotlinc "$K/ScriptParser.kt" "$K/ScriptTimeline.kt" "$K/WavIO.kt" "$K/OutputForm
 java -jar /tmp/subgen-hyp-output-test.jar
 kotlinc "$K/WorkerPolicy.kt" scripts/test_worker_policy.kt -include-runtime -d /tmp/subgen-worker-policy-test.jar
 java -jar /tmp/subgen-worker-policy-test.jar
+kotlinc "$K/VoiceSpeed.kt" scripts/test_voice_speed.kt -include-runtime -d /tmp/subgen-voice-speed-test.jar
+java -jar /tmp/subgen-voice-speed-test.jar
