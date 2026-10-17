@@ -104,7 +104,7 @@ class MainActivity : Activity() {
         val v=TextView(this).apply{
             text=label;textSize=if(kind=="primary")13f else 11f;typeface=mono;letterSpacing=if(kind=="primary").25f else .12f;setTextColor(foreground);gravity=Gravity.CENTER
             setPadding(d(10),d(13),d(10),d(13));background=cardShape(a,border,10)
-            isClickable=true;isFocusable=true;setOnClickListener{callback()}
+            isClickable=true;isFocusable=true;setOnClickListener{Diagnostics.interaction("button:"+label);callback()}
         }
         parent.addView(v,params().apply{topMargin=d(8)});return v
     }
@@ -122,6 +122,9 @@ class MainActivity : Activity() {
         if(StateStore.active(this))runCatching{startForegroundService(Intent(this,RenderService::class.java))}
         handler.post(object:Runnable{override fun run(){if(!isFinishing){refreshStatus();handler.postDelayed(this,1200)}}})
     }
+    override fun onResume(){super.onResume();Diagnostics.setForeground(true)}
+    override fun onPause(){Diagnostics.setForeground(false);super.onPause()}
+    override fun onDestroy(){handler.removeCallbacksAndMessages(null);super.onDestroy()}
     override fun onSaveInstanceState(outState:Bundle){outState.putString("tab",activeTab);super.onSaveInstanceState(outState)}
     private inner class GridBackdrop:android.graphics.drawable.Drawable(){
         private val paint=Paint().apply{color=Color.argb(5,255,59,59);strokeWidth=d(1).toFloat()}
@@ -144,7 +147,13 @@ class MainActivity : Activity() {
         val diag=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;pad(this,30,0,30,0)}
         header.addView(diag,params())
         action(diag,"◉ SUBLIMINAL DIAGNOSTICS","aqua"){
-            AlertDialog.Builder(this).setTitle("Subliminal Diagnostics").setMessage("Native Android · no WebView\nEngine: ${StateStore.status(this)}\nOriginal sliders: ${OriginalStudioControlSpec.sliders.size}\nPreset profiles: ${originalPresets.length()}\nInstalled voice pack: ${ModelInstaller(this).present()}").setPositiveButton("Close",null).show()
+            AlertDialog.Builder(this).setTitle("Subliminal Diagnostics")
+                .setMessage(Diagnostics.overview()+"\n\nEngine: ${StateStore.status(this)}\nOriginal sliders: ${OriginalStudioControlSpec.sliders.size}\nPreset profiles: ${originalPresets.length()}")
+                .setPositiveButton("EXPORT REPORT"){_,_->chooseExport(923,"SubGen-Diagnostic-Report.json")}
+                .setNeutralButton("CLEAR HISTORY"){_,_->AlertDialog.Builder(this).setTitle("Delete diagnostic history?")
+                    .setMessage("Only diagnostic logs will be deleted; audio, settings and presets are unchanged.")
+                    .setPositiveButton("DELETE"){_,_->Diagnostics.clearHistory()}.setNegativeButton("CANCEL",null).show()}
+                .setNegativeButton("CLOSE",null).show()
         }
         space(header,20)
         val save=panel(header,fill=Color.rgb(12,27,37),border=Color.rgb(58,80,94),radius=14,padding=13,margin=0)
@@ -331,6 +340,7 @@ class MainActivity : Activity() {
         val v=OriginalStudioSliderView(this,spec).apply{
             value=p.getFloat("slider:$id",spec.initial.toFloat()).toDouble()
             onUserValueChanged={n->
+                Diagnostics.interaction("slider:$id")
                 p.edit().putFloat("slider:$id",n.toFloat()).putString("presetLabel","Custom").apply()
                 if(id=="ctrl-master-balance-a"||id=="ctrl-master-balance-b")linkBalances()
             }
@@ -355,7 +365,7 @@ class MainActivity : Activity() {
     private fun toggle(parent:LinearLayout,id:String,label:String){
         val value=p.getBoolean("check:$id",false)
         val c=CheckBox(this).apply{ text=label;setTextColor(cool);textSize=11f;typeface=mono;buttonTintList=ColorStateList.valueOf(green)
-            isChecked=value;setPadding(d(2),d(8),d(2),d(8));setOnCheckedChangeListener{_,on->p.edit().putBoolean("check:$id",on).putString("presetLabel","Custom").apply()}
+            isChecked=value;setPadding(d(2),d(8),d(2),d(8));setOnCheckedChangeListener{_,on->Diagnostics.interaction("toggle:$id");p.edit().putBoolean("check:$id",on).putString("presetLabel","Custom").apply()}
         }
         parent.addView(c,params());checks[id]=c
     }
@@ -371,7 +381,7 @@ class MainActivity : Activity() {
         spinner.setSelection(values.indexOf(saved).coerceAtLeast(0))
         spinner.onItemSelectedListener=object:android.widget.AdapterView.OnItemSelectedListener{
             override fun onNothingSelected(parent:android.widget.AdapterView<*>?){}
-            override fun onItemSelected(parent:android.widget.AdapterView<*>?,view:View?,position:Int,rowId:Long){p.edit().putString("select:$id",values[position]).apply()}
+            override fun onItemSelected(parent:android.widget.AdapterView<*>?,view:View?,position:Int,rowId:Long){Diagnostics.interaction("select:$id");p.edit().putString("select:$id",values[position]).apply()}
         }
         parent.addView(spinner,params(d(48)).apply{bottomMargin=d(8)})
         selects[id]=spinner
@@ -407,6 +417,7 @@ class MainActivity : Activity() {
         all.remove(name);p.edit().putString("namedPresets",all.toString()).apply();Toast.makeText(this,"Deleted $name",Toast.LENGTH_SHORT).show()
     }
     private fun renderStudio(preview:Boolean){
+        Diagnostics.stage(if(preview)"PREVIEW_REQUESTED" else "STUDIO_RENDER_REQUESTED")
         if(listOf("carrierStandard","affirmNormal","affirmFrequency").none {p.getString(it,"")?.let{f->File(f).isFile}==true}){
             Toast.makeText(this,"Please load a source recording first",Toast.LENGTH_LONG).show();return
         }
@@ -487,6 +498,7 @@ class MainActivity : Activity() {
         if(resultCode!=RESULT_OK)return;val uri=data?.data?:return
         runCatching{
             when(requestCode){
+                923->{contentResolver.openOutputStream(uri,"wt")!!.bufferedWriter().use{it.write(Diagnostics.report().toString(2))}}
                 910->{val script=contentResolver.openInputStream(uri)!!.bufferedReader().use{it.readText()};p.edit().putString("script",script).apply();showTab("hypnosis")}
                 920->{val all=JSONObject(p.getString("namedPresets","{}")?:"{}");contentResolver.openOutputStream(uri,"wt")!!.bufferedWriter().use{it.write(all.toString(2))}}
                 922->{val report=JSONObject().apply{
@@ -508,6 +520,6 @@ class MainActivity : Activity() {
                     e.apply();sourceLabels[key]?.text="${dest.name} · ${dest.length()/1024} KB"
                 }
             }
-        }.onFailure{Toast.makeText(this,"Import failed: ${it.message}",Toast.LENGTH_LONG).show()}
+        }.onFailure{Diagnostics.failure("IMPORT_OR_EXPORT_FAILED",it);Toast.makeText(this,"Import failed: ${it.message}",Toast.LENGTH_LONG).show()}
     }
 }
