@@ -206,7 +206,7 @@ class RenderService:Service() {
                 if(cancelled.get()){update("Stopped after $finished / $speechCount blocks. Saved blocks retained.");return}
                 if(n !is ScriptNode.Speech)return@forEachIndexed
                 val clip=checkpointFiles[index] ?: error("Missing checkpoint reference")
-                if(cached[index]){cacheHits++}
+                if(cached[index] || runCatching{val c=WavIO.loadMono(clip);c.rate==24000&&c.frames>0}.getOrDefault(false)){cacheHits++}
                 else {
                     val activeTts=tts?:error("Synthesis engine missing for uncached speech block")
                     val deliverySpeed=when(n.delivery){"SLOW"->.82f;"SOFT"->.94f;"WHISPER"->.90f;else->1f}
