@@ -57,7 +57,7 @@ class RenderService:Service() {
         val sid=KokoroNative.voices[voice]?:3
         val installer=ModelInstaller(this);installer.install(::update)
         update("Generating $voice preview in native engine…")
-        KokoroNative(installer,1).use {tts->
+        KokoroNative(installer,InferenceTuner.threads(this)).use {tts->
             val (data,rate)=tts.synthesize("Take a slow, comfortable breath. You can relax now.",sid,p.getFloat("speed",.84f)){cancelled.get()}
             WavIO.writeMono(java.io.File(filesDir,"native-voice-preview.wav"),data,rate)
         }
@@ -70,7 +70,7 @@ class RenderService:Service() {
         val phrase="Take a slow breath. Let each breath feel calmer and easier as your shoulders relax."
         val speed=p.getFloat("speed",.84f)
         val results=mutableListOf<Pair<Int,Double>>()
-        for(threads in listOf(1)){
+        for(threads in listOf(1,2,3)){
             if(cancelled.get())return
             update("Native performance test · $threads inference threads…")
             KokoroNative(installer,threads).use {tts->
@@ -82,6 +82,9 @@ class RenderService:Service() {
             }
         }
         val best=results.minByOrNull{it.second}!!
+        p.edit().putInt("autotuned:threads",best.first).apply()
+        Diagnostics.record("INFERENCE_BENCHMARK_WINNER","",org.json.JSONObject()
+            .put("threads",best.first).put("rtf",best.second))
         p.edit().putInt("threads",best.first).putString("benchmark",results.joinToString(" · "){"${it.first} threads RTF ${"%.2f".format(it.second)}"}).apply()
         update("BEST: ${best.first} threads · ${p.getString("benchmark","")}")
     }
@@ -153,37 +156,59 @@ class RenderService:Service() {
         val sid=KokoroNative.voices[voice]?:3
         val speed=prefs.getFloat("speed",0.84f).coerceIn(.65f,1.2f)
         // Stability mode: limit inference parallelism. User's selected setting remains stored for later.
-        val threads=1
-        Diagnostics.record("STABILITY_MODE", "FP32 neural model, single CPU thread and validated speech blocks")
+        val threads=InferenceTuner.threads(this)
+        Diagnostics.record("SPEED_ENGINE","FP32 + adaptive inference workers + cache-first pipeline")
         val name=prefs.getString("name","Hypnosis Session")?:"Hypnosis Session"
         val nodes=ScriptParser.parse(script,maxSpeechChars=160)
         val speechCount=nodes.count{it is ScriptNode.Speech}
         require(speechCount>0){"Script contains no spoken text"}
         val checkpointFiles=MutableList<File?>(nodes.size){null}
+        val cached=BooleanArray(nodes.size)
+        var preflightHits=0
+        val cacheScanStart=SystemClock.elapsedRealtime()
+        nodes.forEachIndexed { index, n ->
+            if(n !is ScriptNode.Speech) return@forEachIndexed
+            val key=StateStore.hash("native-kokoro-v1_0-fp32-validated|${sid}|${speed}|${n.delivery}|${n.text}")
+            val clip=File(StateStore.blocksDir(this),"$key.wav")
+            val header=runCatching{WavIO.loadMono(clip)}.getOrNull()
+            checkpointFiles[index]=clip
+            if(header!=null && header.rate==24000 && header.frames>0) {
+                cached[index]=true
+                preflightHits++
+            } else if(clip.exists()) clip.delete()
+        }
+        val missing=speechCount-preflightHits
+        Diagnostics.record("SPEECH_CACHE_PREFLIGHT","",org.json.JSONObject()
+            .put("speechBlocks",speechCount).put("reusable",preflightHits)
+            .put("missing",missing).put("scanMs",SystemClock.elapsedRealtime()-cacheScanStart))
         val installer=ModelInstaller(this)
-        Diagnostics.stage("KOKORO_MODEL_INSTALL")
-        installer.install(::update)
-        if(cancelled.get()) {update("Stopped. Installed model retained.");return}
-        update("Loading native Kokoro inference (${threads} CPU threads)…")
+        if(missing>0) {
+            Diagnostics.stage("KOKORO_MODEL_INSTALL")
+            installer.install(::update)
+            if(cancelled.get()) {update("Stopped. Installed model retained.");return}
+            update("Loading Kokoro FP32 with $threads adaptive CPU workers…")
+        } else update("Cache hit · reusing all $speechCount speech blocks without loading Kokoro")
         var finished=0;var generated=0;var cacheHits=0;var generatedSamples=0L;var inferenceMs=0L
         val started=SystemClock.elapsedRealtime()
-        Diagnostics.stage("KOKORO_SYNTHESIS",org.json.JSONObject().put("speechBlocks",speechCount).put("threads",threads))
-        KokoroNative(installer,threads).use { tts->
+        Diagnostics.stage(if(missing>0)"KOKORO_SYNTHESIS" else "CACHE_ONLY_ASSEMBLY",
+            org.json.JSONObject().put("speechBlocks",speechCount).put("threads",threads)
+                .put("cached",preflightHits))
+        fun renderSpeech(tts:KokoroNative?) {
             nodes.forEachIndexed{index,n->
                 if(cancelled.get()){update("Stopped after $finished / $speechCount blocks. Saved blocks retained.");return}
                 if(n !is ScriptNode.Speech)return@forEachIndexed
-                val key=StateStore.hash("native-kokoro-v1_0-fp32-validated|${sid}|${speed}|${n.delivery}|${n.text}")
-                val clip=File(StateStore.blocksDir(this),"$key.wav")
-                val existing=runCatching{WavIO.loadMono(clip)}.getOrNull()
-                if(existing!=null){cacheHits++}
+                val clip=checkpointFiles[index] ?: error("Missing checkpoint reference")
+                if(cached[index]){cacheHits++}
                 else {
+                    val activeTts=tts?:error("Synthesis engine missing for uncached speech block")
                     val deliverySpeed=when(n.delivery){"SLOW"->.82f;"SOFT"->.94f;"WHISPER"->.90f;else->1f}
-                    update("Generating ${finished+1} / $speechCount · $voice · saved $finished")
+                    if(finished==0 || finished%6==0)update("Generating ${finished+1} / $speechCount · $voice · saved $finished")
                     val t0=SystemClock.elapsedRealtime()
                     Diagnostics.beforeNative("KOKORO_BLOCK_START",org.json.JSONObject()
                         .put("block",finished+1).put("speechBlocks",speechCount)
-                        .put("chars",n.text.length).put("delivery",n.delivery))
-                    val (samples,sr)=tts.synthesize(n.text,sid,speed*deliverySpeed){cancelled.get()}
+                        .put("chars",n.text.length).put("delivery",n.delivery),
+                        durable=(finished==0 || finished%16==0))
+                    val (samples,sr)=activeTts.synthesize(n.text,sid,speed*deliverySpeed){cancelled.get()}
                     Diagnostics.record("KOKORO_BLOCK_SUCCESS", "",
                         org.json.JSONObject().put("block",finished+1).put("samples",samples.size)
                             .put("renderMs",SystemClock.elapsedRealtime()-t0))
@@ -194,18 +219,27 @@ class RenderService:Service() {
                 }
                 checkpointFiles[index]=clip
                 finished++
-                update("Speech $finished / $speechCount · reused $cacheHits · ${"%.1f".format((SystemClock.elapsedRealtime()-started)/1000.0)}s elapsed")
+                if(finished%6==0 || finished==speechCount)update("Speech $finished / $speechCount · reused $cacheHits · ${"%.1f".format((SystemClock.elapsedRealtime()-started)/1000.0)}s elapsed")
             }
         }
+        if(missing>0) KokoroNative(installer,threads).use {renderSpeech(it)}
+        else renderSpeech(null)
         if(cancelled.get()){update("Paused with $finished / $speechCount blocks saved");return}
         check(finished==speechCount){"Not all speech blocks are ready"}
+        Diagnostics.record("SPEECH_GENERATION_COMPLETED","",org.json.JSONObject().put("generated",generated).put("reused",cacheHits).put("inferenceMs",inferenceMs))
         update("Mixing WAV from disk, preserving exact pauses…")
         val path=StateStore.partialFile(this)
         Diagnostics.stage("HYPNOSIS_WAV_ASSEMBLY")
+        val assembleStart=SystemClock.elapsedRealtime()
         val sec=WavIO.assemble(nodes,checkpointFiles,path,binOn=prefs.getBoolean("binaural",false))
+        Diagnostics.record("WAV_ASSEMBLY_COMPLETED","",org.json.JSONObject()
+            .put("elapsedMs",SystemClock.elapsedRealtime()-assembleStart)
+            .put("durationSeconds",sec).put("bytes",path.length()))
         if(cancelled.get()){update("Cancelled before export; speech cache is safe");return}
         update("Saving completed WAV to Downloads/SubGen…")
+        val exportStart=SystemClock.elapsedRealtime()
         val uri=WavIO.saveToDownloads(this,path,name)
+        Diagnostics.record("WAV_EXPORT_COMPLETED","",org.json.JSONObject().put("elapsedMs",SystemClock.elapsedRealtime()-exportStart).put("bytes",path.length()))
         val rtf=if(generatedSamples>0)inferenceMs/1000.0/(generatedSamples/24000.0) else 0.0
         update("SAVED · ${"%.1f".format(sec/60)} min · $generated new / $cacheHits reused · RTF ${"%.2f".format(rtf)} · Downloads/SubGen")
         StateStore.prefs(this).edit().putString("lastFileUri",uri.toString()).apply()
