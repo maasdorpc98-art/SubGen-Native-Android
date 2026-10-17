@@ -30,6 +30,7 @@ jobs:
       - name: Core parser and audio verification
         run: |
           python3 scripts/check-source.py
+          python3 scripts/check-studio-parity.py
           bash scripts/run-core-tests.sh
       - name: Native sherpa-onnx runtime and Kotlin JNI bridge
         run: |

@@ -75,18 +75,57 @@ class RenderService:Service() {
     }
     private fun runSubliminal(){
         val p=StateStore.prefs(this)
-        fun path(key:String)=p.getString(key,"")?.let{if(it.isBlank())null else java.io.File(it)}
+        fun path(key:String)=p.getString(key,"")?.let{if(it.isBlank())null else File(it)}
+        fun level(key:String,default:Float)=p.getFloat("slider:$key",default).toDouble()
+        fun enabled(key:String)=p.getBoolean("check:$key",false)
+        val preview=p.getBoolean("subPreview",false)
+        val duration=if(preview)30 else (p.getString("select:ctrl-duration","10")?.toIntOrNull()?:10).coerceIn(1,30)*60
+        val rate=p.getString("select:ctrl-samplerate","44100")?.toIntOrNull()?:44100
+        val hpfArray=intArrayOf(0,20,40,80,100,150,200,300,400,600,800)
+        val lpfArray=intArrayOf(0,18000,16000,14000,12000,10000,8000,6000,4000,3000,2000)
+        val hpf=hpfArray[level("ctrl-carrier-hpf",0f).toInt().coerceIn(0,10)]
+        val lpf=lpfArray[level("ctrl-carrier-lpf",0f).toInt().coerceIn(0,10)]
         val settings=NativeSubliminal.Settings(
-            path("carrierStandard"),path("carrier8d"),path("affirmNormal"),path("affirmFrequency"),
-            p.getInt("subMinutes",5),p.getInt("carrierPercent",50),p.getInt("primaryPercent",50)
+            carrierA=path("carrierStandard")?.let{NativeInputDecoder.prepare(it,::update){cancelled.get()}},
+            carrierB=path("carrierStandard")?.let{NativeInputDecoder.prepare(it,::update){cancelled.get()}},
+            affirmationA=path("affirmNormal")?.let{NativeInputDecoder.prepare(it,::update){cancelled.get()}},
+            affirmationB=path("affirmFrequency")?.let{NativeInputDecoder.prepare(it,::update){cancelled.get()}},
+            durationSeconds=duration,rate=rate,
+            carrierDb=level("ctrl-vol-carrier",0f),carrier8dDb=level("ctrl-vol-carrier-8d",-60f),
+            primaryDb=level("ctrl-vol1",0f),secondaryDb=level("ctrl-vol-noise",0f),
+            layerDb=level("ctrl-na-layer-volume-1",0f),finalDb=level("ctrl-master-output-db",0f),
+            primarySpeed=level("ctrl-na-layer-speed-1",1f),
+            secondarySpeed=if(enabled("ctrl-secondary-mod-on"))level("ctrl-secondary-speed",1f) else level("ctrl-na-layer-speed-1",1f),
+            stereoWidth=level("ctrl-carrier-width",100f)/100.0,
+            fadeSeconds=level("ctrl-carrier-fade",0f),
+            eightDPercent=level("ctrl-carrier-8d-speed",25f),
+            binauralOn=enabled("ctrl-binaural-on"),binauralDb=level("ctrl-binaural-volume",0f),
+            beatHz=level("ctrl-binaural-beat",10f),centerHz=level("ctrl-binaural-center",400f),
+            rhythmicOn=enabled("ctrl-rhythmic-on"),rhythmicDb=level("ctrl-rhythmic-volume",0f),
+            rhythmicPulse=level("ctrl-rhythmic-pulse",6f),rhythmicTone=level("ctrl-rhythmic-tone",400f),
+            rhythmicDepth=level("ctrl-rhythmic-depth",100f)/100.0,
+            rhythmicSine=p.getString("select:ctrl-rhythmic-shape","gated")=="sine",
+            clarity=enabled("ctrl-affirmation-clarity-on"),
+            peakCeiling=(p.getString("select:ctrl-normalize","0.912")?.toDoubleOrNull()?:.912).coerceIn(.1,1.0),
+            highPassHz=hpf.toDouble(),lowPassHz=lpf.toDouble()
         )
         StateStore.active(this,true)
-        val result=java.io.File(filesDir,"subliminal-working.wav")
+        val result=File(filesDir,if(preview)"subliminal-preview.wav" else "subliminal-working.wav")
         NativeSubliminal.mix(settings,result,::update){cancelled.get()}
         if(cancelled.get()){update("Subliminal render cancelled");return}
-        update("Saving Subliminal WAV to Android Downloads…")
-        WavIO.saveToDownloads(this,result,p.getString("subName","Subliminal Session")?:"Subliminal Session")
-        update("SAVED · Subliminal WAV · Downloads/SubGen")
+        if(preview){
+            update("PREVIEW READY · Playing first 30 seconds")
+            val player=android.media.MediaPlayer()
+            try {player.setDataSource(result.absolutePath);player.prepare();player.start()
+                while(player.isPlaying&&!cancelled.get()){Thread.sleep(250)}
+            } finally {player.stop();player.release()}
+            update("PREVIEW COMPLETE · original renderer")
+        }else{
+            update("Saving Subliminal WAV to Android Downloads…")
+            val uri=WavIO.saveToDownloads(this,result,p.getString("subName","Subliminal Session")?:"Subliminal Session")
+            p.edit().putString("subLastFileUri",uri.toString()).apply()
+            update("SAVED · Subliminal WAV · Downloads/SubGen")
+        }
     }
     private fun runJob(){
         val prefs=StateStore.prefs(this)
