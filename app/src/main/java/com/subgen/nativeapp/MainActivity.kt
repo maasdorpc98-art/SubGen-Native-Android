@@ -457,12 +457,35 @@ class MainActivity : Activity() {
             voice.setOnClickListener{p.edit().putString("voice",v).apply();showTab("hypnosis")};voice.isClickable=true
         }
         val speed=panel(session,fill=Color.rgb(21,25,43),border=Color.rgb(88,76,130),padding=12)
-        txt(speed,"VOICE SPEED",10f,cool,monoFont=true)
-        val bar=SeekBar(this).apply{max=55;progress=((p.getFloat("speed",.84f)-.65f)*100).toInt().coerceIn(0,55);progressTintList=ColorStateList.valueOf(violet);thumbTintList=ColorStateList.valueOf(Color.rgb(173,147,250))}
-        speed.addView(bar,params());bar.setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener{
-            override fun onStartTrackingTouch(s:SeekBar){};override fun onStopTrackingTouch(s:SeekBar){}
-            override fun onProgressChanged(s:SeekBar,n:Int,user:Boolean){if(user){p.edit().putFloat("speed",.65f+n/100f).apply();refreshHyp?.invoke()}}
+        val speedValue=txt(speed,"VOICE SPEED · 1.00×",11f,Color.rgb(225,213,255),monoFont=true)
+        val currentVoiceSpeed=p.getFloat("speed",VoiceSpeed.DEFAULT).coerceIn(VoiceSpeed.MIN,VoiceSpeed.MAX)
+        speedValue.text=VoiceSpeed.label(currentVoiceSpeed)
+        val bar=SeekBar(this).apply{
+            max=VoiceSpeed.STEPS
+            progress=VoiceSpeed.position(currentVoiceSpeed)
+            progressTintList=ColorStateList.valueOf(violet)
+            thumbTintList=ColorStateList.valueOf(Color.rgb(173,147,250))
+        }
+        speed.addView(bar,params())
+        txt(speed,"0.65×  ·  1.00× NORMAL  ·  1.20×",9f,cool,monoFont=true)
+        bar.setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener{
+            override fun onStartTrackingTouch(s:SeekBar){}
+            override fun onStopTrackingTouch(s:SeekBar){}
+            override fun onProgressChanged(s:SeekBar,n:Int,user:Boolean){
+                val selected=VoiceSpeed.fromPosition(n)
+                speedValue.text=VoiceSpeed.label(selected)
+                if(user){
+                    p.edit().putFloat("speed",selected).apply()
+                    refreshHyp?.invoke()
+                }
+            }
         })
+        action(speed,"↺ RESET VOICE SPEED · 1.00×"){
+            bar.progress=VoiceSpeed.position(VoiceSpeed.DEFAULT)
+            speedValue.text=VoiceSpeed.label(VoiceSpeed.DEFAULT)
+            p.edit().putFloat("speed",VoiceSpeed.DEFAULT).apply()
+            refreshHyp?.invoke()
+        }
         val pack=if(ModelInstaller(this).present())"OFFLINE VOICES INSTALLED" else "INSTALL OFFLINE VOICE PACK"
         action(session,pack,"aqua"){startAction(RenderService.ACTION_INSTALL)}
         action(session,"BENCHMARK · FIND FASTEST CPU SETTING"){startAction(RenderService.ACTION_BENCHMARK)}
@@ -478,7 +501,7 @@ class MainActivity : Activity() {
         val timeline=panel(check,fill=Color.rgb(17,24,32),border=Color.rgb(76,61,119),radius=11,padding=13,margin=5)
         val previewLines=txt(timeline,"",10f,cool,monoFont=true)
         action(check,"VIEW FULL SCRIPT TIMELINE") {
-            val summary=ScriptTimeline.analyze(field.text.toString(),p.getFloat("speed",.84f))
+            val summary=ScriptTimeline.analyze(field.text.toString(),p.getFloat("speed",VoiceSpeed.DEFAULT))
             val detail=buildString {
                 append("Speech timing is estimated; pauses are exact.\n\n")
                 for(row in summary.rows) {
@@ -578,7 +601,7 @@ class MainActivity : Activity() {
         space(info,6)
         val guidance=txt(info,"",10f,cool,monoFont=true)
         updateSummary={
-            val summary=ScriptTimeline.analyze(field.text.toString(),p.getFloat("speed",.84f))
+            val summary=ScriptTimeline.analyze(field.text.toString(),p.getFloat("speed",VoiceSpeed.DEFAULT))
             stats.text="SPOKEN BLOCKS  "+summary.speechBlocks+
                 "\nPAUSE BLOCKS  "+summary.pauseBlocks+
                 "\nTOTAL EXACT SILENCE  "+ScriptTimeline.time(summary.silenceSeconds)+
