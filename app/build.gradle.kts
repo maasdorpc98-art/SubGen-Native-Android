@@ -7,8 +7,8 @@ android {
         applicationId = "com.subgen.nativeapp.stable"
         minSdk = 29
         targetSdk = 34
-        versionCode = 9
-        versionName = "3.0.9-cache-speed-stable"
+        versionCode = 10
+        versionName = "3.1.0-hyper-voice-foundations"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     buildTypes {
