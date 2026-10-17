@@ -19,14 +19,15 @@ class KokoroNative(installer:ModelInstaller,threads:Int):AutoCloseable {
                     voices="${dir.absolutePath}/voices.bin",
                     tokens="${dir.absolutePath}/tokens.txt",
                     dataDir="${dir.absolutePath}/espeak-ng-data",
-                    lexicon=FilePathOrEmpty("${dir.absolutePath}/lexicon-us-en.txt")
+                    lexicon=FilePathOrEmpty("${dir.absolutePath}/lexicon-us-en.txt"),
+                    lang="en-us"
                 ),
                 numThreads=threads.coerceIn(1,4),provider="cpu",debug=false
             ), maxNumSentences=1
         )
         Diagnostics.beforeNative("KOKORO_ENGINE_CREATE",
             org.json.JSONObject().put("threads",threads.coerceIn(1,4))
-                .put("modelBytes",installer.modelFile().length()))
+                .put("modelBytes",installer.modelFile().length()).put("precision",ModelInstaller.MODEL_VARIANT))
         engine=OfflineTts(config=config)
         Diagnostics.record("KOKORO_ENGINE_READY", "", org.json.JSONObject().put("numSpeakers",engine.numSpeakers()).put("sampleRate",engine.sampleRate()))
     }
@@ -46,8 +47,18 @@ class KokoroNative(installer:ModelInstaller,threads:Int):AutoCloseable {
             config=GenerationConfig(sid=speaker,speed=speed.coerceIn(0.6f,1.4f),silenceScale=0.0f)
         )
         require(!onStop()){"Speech generation cancelled after block"}
-        require(generated.samples.isNotEmpty()){"Kokoro generated an empty speech block"}
-        require(generated.samples.all{it.isFinite()}){"Kokoro generated invalid samples"}
+        val audio=AudioQuality.examine(generated.samples)
+        val details=org.json.JSONObject()
+            .put("modelVariant",ModelInstaller.MODEL_VARIANT).put("samples",audio.count)
+            .put("sampleRate",generated.sampleRate).put("nanCount",audio.nanCount)
+            .put("infiniteCount",audio.infiniteCount).put("clippedCount",audio.clippedCount)
+            .put("longestRailRun",audio.longestRailRun).put("peak",audio.peak)
+            .put("rms",audio.rms)
+        if(!audio.isAcceptable(generated.sampleRate)) {
+            Diagnostics.record("KOKORO_AUDIO_REJECTED","Generated audio is corrupt or near-silent; refusing to save",details)
+            throw IllegalStateException("Kokoro returned unusable audio; see KOKORO_AUDIO_REJECTED diagnostics")
+        }
+        Diagnostics.record("KOKORO_AUDIO_ACCEPTED","",details)
         Diagnostics.record("KOKORO_GENERATE_COMPLETED","",
             org.json.JSONObject().put("samples",generated.samples.size)
                 .put("sampleRate",generated.sampleRate))
