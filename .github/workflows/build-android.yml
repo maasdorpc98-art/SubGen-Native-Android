@@ -2,7 +2,7 @@ name: Native Android APK
 on:
   workflow_dispatch:
   push:
-    branches: [main, subgen-v3.0.1-diagnostic-apk, subgen-v3.0.2-stability]
+    branches: [main, subgen-v3.0.1-diagnostic-apk, subgen-v3.0.2-stability, subgen-v3.0.3-jni-stability]
   pull_request:
 jobs:
   android:
@@ -33,6 +33,7 @@ jobs:
           python3 scripts/check-studio-parity.py
           python3 scripts/check-diagnostics.py
           python3 scripts/check-stability.py
+          python3 scripts/check-jni-stability.py
           bash scripts/run-core-tests.sh
       - name: Native sherpa-onnx runtime and Kotlin JNI bridge
         run: |
@@ -58,26 +59,26 @@ jobs:
           if-no-files-found: error
 
       - name: Create exact source snapshot from this commit
-        run: git archive --format=zip HEAD -o "$RUNNER_TEMP/SubGen-Native-v3.0.2-Stability-Source.zip"
+        run: git archive --format=zip HEAD -o "$RUNNER_TEMP/SubGen-Native-v3.0.3-JNI-Stability-Source.zip"
       - name: Upload matching source snapshot
         uses: actions/upload-artifact@v4
         with:
-          name: SubGen-Native-v3.0.2-Stability-Source
-          path: ${{ runner.temp }}/SubGen-Native-v3.0.2-Stability-Source.zip
+          name: SubGen-Native-v3.0.3-JNI-Stability-Source
+          path: ${{ runner.temp }}/SubGen-Native-v3.0.3-JNI-Stability-Source.zip
           if-no-files-found: error
       - name: Publish installable diagnostic APK pre-release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/subgen-v3.0.2-stability'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/subgen-v3.0.3-jni-stability'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG='v3.0.2-stability-test'
+          TAG='v3.0.3-jni-stability-test'
           APK='app/build/outputs/apk/debug/app-debug.apk'
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else
             gh release create "$TAG" "$APK" \
-              --title 'Sub Gen Native v3.0.2 Stability Test' \
-              --notes 'Stability-focused native Android test APK. Prevents automatic crash restarts; bounded Kokoro inference; Android exit diagnostics. Installs separately. Not yet device-validated.' \
+              --title 'Sub Gen Native v3.0.3 JNI Stability Test' \
+              --notes 'Native Kotlin Kokoro uses non-callback JNI generation to avoid documented SIGABRT problem, preserving bounded checkpoint rendering, original UI and crash diagnostics. Device validation required.' \
               --prerelease --target "$GITHUB_SHA"
           fi

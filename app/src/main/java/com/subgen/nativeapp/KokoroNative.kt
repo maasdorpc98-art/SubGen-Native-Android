@@ -28,19 +28,24 @@ class KokoroNative(installer:ModelInstaller,threads:Int):AutoCloseable {
             org.json.JSONObject().put("threads",threads.coerceIn(1,4))
                 .put("modelBytes",installer.modelFile().length()))
         engine=OfflineTts(config=config)
-        Diagnostics.record("KOKORO_ENGINE_READY")
+        Diagnostics.record("KOKORO_ENGINE_READY", "", org.json.JSONObject().put("numSpeakers",engine.numSpeakers()).put("sampleRate",engine.sampleRate()))
     }
     private fun FilePathOrEmpty(path:String):String=java.io.File(path).takeIf{it.isFile}?.absolutePath?:""
     fun synthesize(text:String,speaker:Int,speed:Float,onStop:()->Boolean):Pair<FloatArray,Int> {
-        // Bounded JNI input protects against accidental unbounded inference allocations.
+        // The native callback overload can SIGABRT in sherpa-onnx on Android.
+        // Non-callback inference preserves the complete result; cancellation is checked
+        // at safe boundaries between short, disk-checkpointed speech blocks.
+        require(!onStop()){"Speech generation cancelled before block"}
         require(text.length in 1..180){"Speech block outside stable 180-character synthesis limit"}
+        require(speaker in 0 until engine.numSpeakers()){"Requested speaker is not present in installed Kokoro model"}
         Diagnostics.beforeNative("KOKORO_GENERATE",org.json.JSONObject().put("characters",text.length)
             .put("speaker",speaker).put("speed",speed.toDouble()))
-        val generated=engine.generateWithConfigAndCallback(
+        // IMPORTANT: no callback crosses the C++ -> JVM JNI boundary.
+        val generated=engine.generateWithConfig(
             text=text,
-            config=GenerationConfig(sid=speaker,speed=speed.coerceIn(0.6f,1.4f),silenceScale=0.0f),
-            callback={if(onStop())0 else 1}
+            config=GenerationConfig(sid=speaker,speed=speed.coerceIn(0.6f,1.4f),silenceScale=0.0f)
         )
+        require(!onStop()){"Speech generation cancelled after block"}
         require(generated.samples.isNotEmpty()){"Kokoro generated an empty speech block"}
         require(generated.samples.all{it.isFinite()}){"Kokoro generated invalid samples"}
         Diagnostics.record("KOKORO_GENERATE_COMPLETED","",
