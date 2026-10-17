@@ -33,15 +33,19 @@ class RenderService:Service() {
             if(Build.VERSION.SDK_INT>=29)startForeground(ID,note,ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
             else startForeground(ID,note)
             executor.execute {
+                val started=SystemClock.elapsedRealtime()
+                var outcome="success"
+                Diagnostics.startJob(intent?.action ?: "hypnosis-render")
                 try {acquireWake();when(intent?.action){ACTION_INSTALL->installOnly();ACTION_SUBLIMINAL->runSubliminal();ACTION_BENCHMARK->benchmark();ACTION_PREVIEW->previewVoice();else->runJob()}}
-                catch(t:Throwable){update("Stopped: ${t.message?:t.javaClass.simpleName}")}
-                finally {StateStore.active(this,false);releaseWake();busy.set(false);stopForeground(STOP_FOREGROUND_REMOVE);stopSelfResult(startId)}
+                catch(t:Throwable){outcome="failed";Diagnostics.failure("JOB_FAILED",t);update("Stopped: ${t.message?:t.javaClass.simpleName}")}
+                finally {Diagnostics.finishJob(if(cancelled.get())"cancelled" else outcome,SystemClock.elapsedRealtime()-started);StateStore.active(this,false);releaseWake();busy.set(false);stopForeground(STOP_FOREGROUND_REMOVE);stopSelfResult(startId)}
             }
         }
         return START_STICKY
     }
-    private fun installOnly(){ModelInstaller(this).install(::update)}
+    private fun installOnly(){Diagnostics.stage("MODEL_INSTALL");ModelInstaller(this).install(::update)}
     private fun previewVoice(){
+        Diagnostics.stage("VOICE_PREVIEW")
         val p=StateStore.prefs(this);val voice=p.getString("voice","SERENA")?:"SERENA"
         val sid=KokoroNative.voices[voice]?:3
         val installer=ModelInstaller(this);installer.install(::update)
@@ -53,6 +57,7 @@ class RenderService:Service() {
         update("VOICE PREVIEW READY · tap PLAY PREVIEW")
     }
     private fun benchmark(){
+        Diagnostics.stage("VOICE_BENCHMARK")
         val p=StateStore.prefs(this);val installer=ModelInstaller(this);installer.install(::update)
         val sid=KokoroNative.voices[p.getString("voice","SERENA")]?:3
         val phrase="Take a slow breath. Let each breath feel calmer and easier as your shoulders relax."
@@ -74,6 +79,7 @@ class RenderService:Service() {
         update("BEST: ${best.first} threads · ${p.getString("benchmark","")}")
     }
     private fun runSubliminal(){
+        Diagnostics.stage("SUBLIMINAL_PREPARE")
         val p=StateStore.prefs(this)
         fun path(key:String)=p.getString(key,"")?.let{if(it.isBlank())null else File(it)}
         fun level(key:String,default:Float)=p.getFloat("slider:$key",default).toDouble()
@@ -109,9 +115,12 @@ class RenderService:Service() {
             peakCeiling=(p.getString("select:ctrl-normalize","0.912")?.toDoubleOrNull()?:.912).coerceIn(.1,1.0),
             highPassHz=hpf.toDouble(),lowPassHz=lpf.toDouble()
         )
+        Diagnostics.expectedOutput(duration.toLong()*rate*4L+44)
+        Diagnostics.stage("SUBLIMINAL_MIX",org.json.JSONObject().put("durationSeconds",duration).put("sampleRate",rate))
         StateStore.active(this,true)
         val result=File(filesDir,if(preview)"subliminal-preview.wav" else "subliminal-working.wav")
         NativeSubliminal.mix(settings,result,::update){cancelled.get()}
+        Diagnostics.stage("SUBLIMINAL_WAV_COMPLETE")
         if(cancelled.get()){update("Subliminal render cancelled");return}
         if(preview){
             update("PREVIEW READY · Playing first 30 seconds")
@@ -128,6 +137,7 @@ class RenderService:Service() {
         }
     }
     private fun runJob(){
+        Diagnostics.stage("HYPNOSIS_PREPARE")
         val prefs=StateStore.prefs(this)
         val script=prefs.getString("script", "")?.trim().orEmpty()
         require(script.isNotEmpty()){ "Enter a Hypnosis script first" }
@@ -142,11 +152,13 @@ class RenderService:Service() {
         require(speechCount>0){"Script contains no spoken text"}
         val checkpointFiles=MutableList<File?>(nodes.size){null}
         val installer=ModelInstaller(this)
+        Diagnostics.stage("KOKORO_MODEL_INSTALL")
         installer.install(::update)
         if(cancelled.get()) {update("Stopped. Installed model retained.");return}
         update("Loading native Kokoro inference (${threads} CPU threads)…")
         var finished=0;var generated=0;var cacheHits=0;var generatedSamples=0L;var inferenceMs=0L
         val started=SystemClock.elapsedRealtime()
+        Diagnostics.stage("KOKORO_SYNTHESIS")
         KokoroNative(installer,threads).use { tts->
             nodes.forEachIndexed{index,n->
                 if(cancelled.get()){update("Stopped after $finished / $speechCount blocks. Saved blocks retained.");return}
@@ -174,6 +186,7 @@ class RenderService:Service() {
         check(finished==speechCount){"Not all speech blocks are ready"}
         update("Mixing WAV from disk, preserving exact pauses…")
         val path=StateStore.partialFile(this)
+        Diagnostics.stage("HYPNOSIS_WAV_ASSEMBLY")
         val sec=WavIO.assemble(nodes,checkpointFiles,path,binOn=prefs.getBoolean("binaural",false))
         if(cancelled.get()){update("Cancelled before export; speech cache is safe");return}
         update("Saving completed WAV to Downloads/SubGen…")
@@ -182,7 +195,7 @@ class RenderService:Service() {
         update("SAVED · ${"%.1f".format(sec/60)} min · $generated new / $cacheHits reused · RTF ${"%.2f".format(rtf)} · Downloads/SubGen")
         StateStore.prefs(this).edit().putString("lastFileUri",uri.toString()).apply()
     }
-    private fun update(message:String){StateStore.status(this,message);(getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(ID,notification(message))}
+    private fun update(message:String){Diagnostics.progress(message);StateStore.status(this,message);(getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(ID,notification(message))}
     private fun notification(message:String):Notification {
         val open=PendingIntent.getActivity(this,0,Intent(this,MainActivity::class.java),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val stop=PendingIntent.getService(this,1,Intent(this,RenderService::class.java).setAction(ACTION_CANCEL),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)

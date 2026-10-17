@@ -78,6 +78,8 @@ object NativeSubliminal {
     )
     private const val TAU=2*Math.PI
     fun mix(s:Settings,dest:File,update:(String)->Unit,stop:()->Boolean){
+        val mixStarted=android.os.SystemClock.elapsedRealtime()
+        Diagnostics.stage("MIXER_OPEN_SOURCES")
         val files=listOf(s.carrierA,s.carrierB,s.affirmationA,s.affirmationB)
         require(files.any{it!=null}){"Select at least one Carrier or Affirmation audio file"}
         val sources=files.map{it?.let(::Source)}
@@ -85,6 +87,7 @@ object NativeSubliminal {
             val sr=s.rate.coerceIn(32000,48000)
             val seconds=s.durationSeconds.coerceIn(1,60*90)
             val frames=seconds.toLong()*sr
+            Diagnostics.expectedOutput(frames*4L+44L)
             require(frames*4L<0xFFFFFFFFL){"WAV exceeds RIFF size limit"}
             fun gain(db:Double)=10.0.pow(db.coerceIn(-60.0,0.0)/20.0)
             val g0=gain(s.carrierDb)
@@ -153,10 +156,16 @@ object NativeSubliminal {
                     }
                     out.write(buf,0,cursor);frame+=n
                     if(frame%(sr*4L)<chunkFrames)update("Mixing ${frame*100/frames}% · ${frame/sr}s / ${seconds}s")
+                    if(frame%(sr*20L)<chunkFrames) {
+                        val elapsed=android.os.SystemClock.elapsedRealtime()-mixStarted
+                        Diagnostics.record("MIXER_CHECKPOINT","",org.json.JSONObject().put("audioSeconds",frame/sr)
+                            .put("elapsedMs",elapsed).put("realtimeFactor",elapsed/1000.0/(frame.toDouble()/sr).coerceAtLeast(0.001)))
+                    }
                 }
             }
             if(dest.exists())dest.delete()
             require(tmp.renameTo(dest)){"Cannot finish WAV export"}
+            Diagnostics.record("MIXER_COMPLETED","",org.json.JSONObject().put("elapsedMs",android.os.SystemClock.elapsedRealtime()-mixStarted).put("wavBytes",dest.length()))
         } finally {sources.forEach{it?.close()}}
     }
 }

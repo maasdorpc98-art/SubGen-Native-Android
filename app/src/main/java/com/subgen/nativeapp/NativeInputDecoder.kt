@@ -22,11 +22,15 @@ object NativeInputDecoder {
         if (isPcm16Wav(file))return file
         val out=File(file.parentFile,file.name+".decoded.wav")
         if(out.isFile&&out.lastModified()>=file.lastModified()&&isPcm16Wav(out))return out
+        Diagnostics.stage("INPUT_CODEC",org.json.JSONObject().put("bytes",file.length()))
         update("Decoding ${file.name} with Android MediaCodec…")
         val temporary=File(out.parentFile,out.name+".partial")
-        decode(file,temporary,stop)
+        try { decode(file,temporary,stop) } catch(t:Throwable) {
+            Diagnostics.failure("INPUT_DECODE_FAILED",t);throw t
+        }
         if(out.exists())out.delete()
         check(temporary.renameTo(out)){"Cannot save decoded WAV"}
+        Diagnostics.record("INPUT_DECODE_COMPLETED",extra=org.json.JSONObject().put("decodedBytes",out.length()))
         return out
     }
     private fun isPcm16Wav(file:File):Boolean=runCatching {
