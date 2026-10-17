@@ -201,7 +201,7 @@ class RenderService:Service() {
         Diagnostics.stage(if(missing>0)"KOKORO_SYNTHESIS" else "CACHE_ONLY_ASSEMBLY",
             org.json.JSONObject().put("speechBlocks",speechCount).put("threads",threads)
                 .put("cached",preflightHits))
-        fun renderSpeech(tts:KokoroNative?) {
+        fun renderSpeech(tts:AdaptiveNeuralSession?) {
             nodes.forEachIndexed{index,n->
                 if(cancelled.get()){update("Stopped after $finished / $speechCount blocks. Saved blocks retained.");return}
                 if(n !is ScriptNode.Speech)return@forEachIndexed
@@ -216,7 +216,7 @@ class RenderService:Service() {
                         .put("block",finished+1).put("speechBlocks",speechCount)
                         .put("chars",n.text.length).put("delivery",n.delivery),
                         durable=(finished==0 || finished%16==0))
-                    val (samples,sr)=activeTts.synthesize(n.text,sid,speed*deliverySpeed){cancelled.get()}
+                    val (samples,sr)=activeTts.synthesize(n.text,sid,speed*deliverySpeed)
                     Diagnostics.record("KOKORO_BLOCK_SUCCESS", "",
                         org.json.JSONObject().put("block",finished+1).put("samples",samples.size)
                             .put("renderMs",SystemClock.elapsedRealtime()-t0))
@@ -239,7 +239,7 @@ class RenderService:Service() {
                 }
             }
         }
-        if(missing>0) KokoroNative(installer,threads).use {tts->
+        if(missing>0) AdaptiveNeuralSession(installer,threads){cancelled.get()}.use {tts->
             Diagnostics.record("KOKORO_ENGINE_LOAD_TIME","",org.json.JSONObject()
                 .put("elapsedMs",SystemClock.elapsedRealtime()-initStarted).put("workers",threads))
             renderSpeech(tts)
