@@ -12,7 +12,7 @@ assert 'if(missing>0) KokoroNative(installer,threads).use' in render
 assert 'else renderSpeech(null)' in render
 assert 'WAV_ASSEMBLY_COMPLETED' in render and 'WAV_EXPORT_COMPLETED' in render
 assert 'InferenceTuner.threads(this)' in render
-assert 'autotuned:threads' in render and 'putInt("autotuned:threads"' in render
+assert 'InferenceTuner.rememberBenchmark(this,best.first,best.second)' in render
 assert 'android.webkit.' not in render
 assert 'ByteArray(65536)' in wav and 'writeHeader(out,frames,sr,2)' in wav
 assert 'outputBytes[q]=lo' in wav and 'silenceBytes' in wav
