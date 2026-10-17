@@ -34,13 +34,18 @@ class KokoroNative(installer:ModelInstaller,threads:Int):AutoCloseable {
     fun synthesize(text:String,speaker:Int,speed:Float,onStop:()->Boolean):Pair<FloatArray,Int> {
         // Bounded JNI input protects against accidental unbounded inference allocations.
         require(text.length in 1..180){"Speech block outside stable 180-character synthesis limit"}
-        Diagnostics.beforeNative("KOKORO_GENERATE",org.json.JSONObject().put("characters",text.length)
+        Diagnostics.beforeNative("KOKORO_GENERATE_NO_CALLBACK",org.json.JSONObject().put("characters",text.length)
             .put("speaker",speaker).put("speed",speed.toDouble()))
-        val generated=engine.generateWithConfigAndCallback(
+        // Sherpa Android JNI v1.13.8 callback mode can SIGABRT on the first
+        // utterance. Keep identical generation settings, but pass a NULL JNI
+        // callback through generateWithConfig() instead. Cancellation is
+        // checked between the already bounded <=180-character blocks.
+        if (onStop()) throw java.util.concurrent.CancellationException("Generation cancelled before speech block")
+        val generated=engine.generateWithConfig(
             text=text,
-            config=GenerationConfig(sid=speaker,speed=speed.coerceIn(0.6f,1.4f),silenceScale=0.0f),
-            callback={if(onStop())0 else 1}
+            config=GenerationConfig(sid=speaker,speed=speed.coerceIn(0.6f,1.4f),silenceScale=0.0f)
         )
+        if (onStop()) throw java.util.concurrent.CancellationException("Generation cancelled after speech block")
         require(generated.samples.isNotEmpty()){"Kokoro generated an empty speech block"}
         require(generated.samples.all{it.isFinite()}){"Kokoro generated invalid samples"}
         Diagnostics.record("KOKORO_GENERATE_COMPLETED","",
