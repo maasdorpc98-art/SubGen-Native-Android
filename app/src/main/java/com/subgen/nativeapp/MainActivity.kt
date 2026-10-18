@@ -697,7 +697,8 @@ class MainActivity : Activity() {
         val gainLabel=txt(directionPanel,"GLOBAL DIRECTION GAIN · +0.0 dB",10f,Color.rgb(201,187,255),monoFont=true)
         val globalGain=SeekBar(this).apply{
             max=120;progress=((p.getFloat("dir:gain",0f)+12f)*10).roundToInt().coerceIn(0,120)
-            progressTintList=ColorStateList.valueOf(violet)            thumbTintList=ColorStateList.valueOf(Color.rgb(173,147,250))
+            progressTintList=ColorStateList.valueOf(violet)
+            thumbTintList=ColorStateList.valueOf(Color.rgb(173,147,250))
         }
         directionPanel.addView(globalGain,params())
         globalGain.setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener{
