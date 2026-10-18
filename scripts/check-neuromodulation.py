@@ -7,13 +7,16 @@ manifest=(r/'app/src/main/AndroidManifest.xml').read_text()
 assert 'tabNeuro=tab("≈ NEUROMOD")' in u
 assert 'if(name=="neuro")' in u
 assert 'private fun buildNeuro()' in u
-assert 'VERSION B · ORIGINAL OFDM/QAM ENGINE — NOT YET PORTED' in u
+assert 'VERSION B · OFDM/QAM' in u and 'GENERATE A + B' in u
 assert 'if(name=="studio")buildStudio() else buildHypnosis()' not in u
 assert 'affirmFrequency' in u and 'neuro:mixer' in u
+assert 'NeuroModulationB.generate' in s and 'NeuroModulationB.createMixerCopy' in s
+assert 'neuro:verified:$version' in s
 assert 'NEURO_GENERATE' in s and 'NeuroModulationA.generate' in s and 'NeuroModulationA.createMixerCopy' in s
 assert 'NeuroModulationService' in manifest
 assert 'samples[i]=y' not in a  # no giant in-memory WAV buffer
 assert 'Digital roundtrip verification failed' in a and 'Master exceeds original' in a
 assert 'Version A' in a and 'Version B' in a
-assert 'versionCode = 12' in (r/'app/build.gradle.kts').read_text()
-print('PASS: native third tab, protected master, verified A, mixer handoff, honest B disabled, stable versionCode12')
+assert 'isEnabled=true' in u and 'if(requireReady())' in u
+assert 'versionCode = 13' in (r/'app/build.gradle.kts').read_text()
+print('PASS: native third tab, protected master, verified A, mixer handoff, B/A+B functional, clearly gated exports, stable versionCode13')
