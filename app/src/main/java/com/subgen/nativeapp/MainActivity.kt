@@ -12,6 +12,9 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
+import android.media.MediaPlayer
+import android.media.MediaMetadataRetriever
+import android.provider.OpenableColumns
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -54,6 +57,9 @@ class MainActivity : Activity() {
     private lateinit var body:LinearLayout
     private lateinit var tabStudio:TextView
     private lateinit var tabHypnosis:TextView
+    private lateinit var tabNeuro:TextView
+    private var neuroStatusText:TextView?=null
+    private var neuroPlayer:MediaPlayer?=null
     private lateinit var status:TextView
     private var activeTab="studio"
     private var applyingPreset=false
@@ -125,7 +131,7 @@ class MainActivity : Activity() {
     }
     override fun onResume(){super.onResume();Diagnostics.setForeground(true)}
     override fun onPause(){Diagnostics.setForeground(false);super.onPause()}
-    override fun onDestroy(){handler.removeCallbacksAndMessages(null);super.onDestroy()}
+    override fun onDestroy(){handler.removeCallbacksAndMessages(null);neuroPlayer?.release();neuroPlayer=null;super.onDestroy()}
     override fun onSaveInstanceState(outState:Bundle){outState.putString("tab",activeTab);super.onSaveInstanceState(outState)}
     private inner class GridBackdrop:android.graphics.drawable.Drawable(){
         private val paint=Paint().apply{color=Color.argb(5,255,59,59);strokeWidth=d(1).toFloat()}
@@ -174,19 +180,26 @@ class MainActivity : Activity() {
         }
         tabStudio=tab("⚙  STUDIO")
         tabHypnosis=tab("🧠 HYPNOSIS ENGINE")
+        tabNeuro=tab("≈ NEUROMOD")
         tabStudio.setOnClickListener{showTab("studio")}
         tabHypnosis.setOnClickListener{showTab("hypnosis")}
+        tabNeuro.setOnClickListener{showTab("neuro")}
         space(header,26)
     }
-    private fun showTab(name:String){activeTab=name;refreshHyp=null;body.removeAllViews();slides.clear();checks.clear();selects.clear();sourceLabels.clear()
+    private fun showTab(name:String){activeTab=name;refreshHyp=null;neuroStatusText=null;body.removeAllViews();slides.clear();checks.clear();selects.clear();sourceLabels.clear()
         val onBg=cardShape(Color.rgb(52,26,34),Color.rgb(155,33,39),8)
         tabStudio.background=if(name=="studio")onBg else null
         tabHypnosis.background=if(name=="hypnosis")cardShape(Color.rgb(52,26,34),Color.rgb(155,33,39),8) else null
+        tabNeuro.background=if(name=="neuro")cardShape(Color.rgb(52,26,34),Color.rgb(155,33,39),8) else null
         tabStudio.setTextColor(if(name=="studio")coral else cool)
         tabHypnosis.setTextColor(if(name=="hypnosis")coral else cool)
-        if(name=="studio")buildStudio() else buildHypnosis()
+        tabNeuro.setTextColor(if(name=="neuro")coral else cool)
+        when(name){"studio"->buildStudio();"neuro"->buildNeuro();else->buildHypnosis()}
     }
-    private fun refreshStatus(){if(::status.isInitialized){status.text=StateStore.status(this)}}
+    private fun refreshStatus(){
+        if(::status.isInitialized)status.text=StateStore.status(this)
+        if(activeTab=="neuro")neuroStatusText?.text=p.getString("neuro:status","Ready for spoken audio")
+    }
     private fun statusCard(label:String,value:String,detail:String,tint:Int):LinearLayout{
         val c=panel(body,fill=Color.rgb(20,26,34),border=Color.rgb(54,65,75),radius=13,padding=15,margin=11)
         c.setPadding(d(17),d(14),d(15),d(17))
@@ -435,6 +448,132 @@ class MainActivity : Activity() {
     }
     private fun chooseJson(code:Int){val i=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="application/json"}
         @Suppress("DEPRECATION")startActivityForResult(i,code)
+    }
+    private fun buildNeuro(){
+        val intro=panel(body,fill=Color.rgb(24,18,27),border=Color.rgb(130,36,54),padding=18)
+        txt(intro,"NEUROMODULATION",21f,coral,true,tracking=.13f,gravity=Gravity.CENTER)
+        txt(intro,"Experiment 001 · Native source-derived frequency encoder",10f,cool,gravity=Gravity.CENTER)
+        space(intro,7)
+        txt(intro,"Version A is implemented natively. Version B needs the actual Python predictor/LZMA/OFDM/QAM encoder ported and verified; it is not simulated.",10f,cool)
+        val input=section(body,"01 — Original Spoken Affirmations")
+        txt(input,"Local files only · the original source is never overwritten",10f,green)
+        val sourceFile=p.getString("neuro:input",null)?.let(::File)
+        txt(input,if(sourceFile?.isFile==true)"SOURCE · ${sourceFile.name} · ${sourceFile.length()/1024} KB" else "No spoken recording loaded",11f,bright)
+        action(input,"▣ CHOOSE AFFIRMATION AUDIO"){
+            val pick=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="audio/*"}
+            @Suppress("DEPRECATION")startActivityForResult(pick,930)
+        }
+        txt(input,"WAV / MP3 / FLAC / M4A accepted when Android can decode them. Version A normalizes to 24 kHz mono PCM16 before encoding.",9f,cool)
+
+        val modes=section(body,"02 — Original Experiment Method")
+        val selected=subCard(modes,"● VERSION A — NATIVE","Direct integer speech × positive 40 Hz amplitude envelope",Color.rgb(120,48,56))
+        txt(selected,"96 kHz mono PCM32 master · independently verified exact recovery of normalized PCM16.",10f,green)
+        action(modes,"VERSION B · ORIGINAL OFDM/QAM ENGINE — NOT YET PORTED"){
+            AlertDialog.Builder(this).setTitle("Version B requires its original encoder")
+                .setMessage("The supplied Python reference uses a speech sine predictor, LZMA correction, two-channel 22-bit QAM and OFDM. A native port with independent recovery tests is required. No fake B output will be generated.")
+                .setPositiveButton("OK",null).show()
+        }
+        action(modes,"GENERATE A + B — UNAVAILABLE UNTIL B IS VERIFIED"){
+            Toast.makeText(this,"Native B is pending; choose Version A for now",Toast.LENGTH_LONG).show()
+        }
+
+        val settings=section(body,"03 — Encoding Settings")
+        txt(settings,"REFERENCE · 60 seconds · 40 Hz modulation · 90% depth",11f,bright,true)
+        action(settings,"60 SECONDS · ORIGINAL EXPERIMENT"){
+            p.edit().putString("neuro:seconds","60").apply();showTab("neuro")
+        }
+        action(settings,"MATCH SOURCE LENGTH · MAXIMUM 180 SECONDS"){
+            val f=p.getString("neuro:input",null)?.let(::File)
+            if(f?.isFile!=true){Toast.makeText(this,"Select source audio first",Toast.LENGTH_LONG).show();return@action}
+            runCatching{
+                val seconds=runCatching{val m=NeuroModulationA.inspect(f);m.frames.toDouble()/m.rate}.getOrElse{
+                    val m=MediaMetadataRetriever();try{m.setDataSource(f.absolutePath);(m.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toDoubleOrNull()?:error("Cannot read source duration"))/1000.0}finally{m.release()}
+                }
+                require(seconds in 1.0..180.0){"Source length must be between 1 and 180 seconds to match it directly"}
+                p.edit().putString("neuro:seconds",String.format(Locale.US,"%.3f",seconds)).apply();showTab("neuro")
+            }.onFailure{Toast.makeText(this,it.message,Toast.LENGTH_LONG).show()}
+        }
+        val seconds=textEntry(settings,"Output seconds · custom 1–180","neuro:seconds",p.getString("neuro:seconds","60")?:"60",single=true)
+        seconds.inputType=android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+        txt(settings,"For Version A, output must contain at least one frame per normalized source sample. Long sources are rejected if the requested output is too short.",9f,cool)
+        val custom=CheckBox(this).apply{text="Allow custom AM frequency and depth";textSize=12f;setTextColor(bright);buttonTintList=ColorStateList.valueOf(coral);isChecked=p.getBoolean("neuro:custom",false)}
+        settings.addView(custom,params())
+        val hzLabel=txt(settings,"FREQUENCY · ${p.getFloat("neuro:hz",40f)} Hz",11f,coral,true)
+        val hz=SeekBar(this).apply{max=199;progress=((p.getFloat("neuro:hz",40f)-.5f)*2).roundToInt().coerceIn(0,199);isEnabled=custom.isChecked}
+        settings.addView(hz,params(d(48)))
+        val depthLabel=txt(settings,"DEPTH · ${p.getInt("neuro:depth",90)}%",11f,coral,true)
+        val depth=SeekBar(this).apply{max=98;progress=p.getInt("neuro:depth",90).coerceIn(0,98);isEnabled=custom.isChecked}
+        settings.addView(depth,params(d(48)))
+        hz.setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener{
+            override fun onProgressChanged(bar:SeekBar?,n:Int,user:Boolean){val v=.5f+n*.5f;hzLabel.text="FREQUENCY · $v Hz";if(user)p.edit().putFloat("neuro:hz",v).apply()}
+            override fun onStartTrackingTouch(bar:SeekBar?){};override fun onStopTrackingTouch(bar:SeekBar?){}
+        })
+        depth.setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener{
+            override fun onProgressChanged(bar:SeekBar?,n:Int,user:Boolean){depthLabel.text="DEPTH · $n%";if(user)p.edit().putInt("neuro:depth",n).apply()}
+            override fun onStartTrackingTouch(bar:SeekBar?){};override fun onStopTrackingTouch(bar:SeekBar?){}
+        })
+        custom.setOnCheckedChangeListener{_,enabled->
+            hz.isEnabled=enabled;depth.isEnabled=enabled
+            p.edit().putBoolean("neuro:custom",enabled).apply()
+        }
+
+        val run=section(body,"04 — Generate & Verify")
+        neuroStatusText=txt(run,p.getString("neuro:status","Ready for spoken audio")?:"Ready for spoken audio",11f,green,true)
+        action(run,"▶ GENERATE NATIVE VERSION A","primary"){
+            if(p.getBoolean("neuro:active",false)){
+                Toast.makeText(this,"NeuroModulation already processing",Toast.LENGTH_LONG).show();return@action
+            }
+            if(p.getString("neuro:input",null)?.let(::File)?.isFile!=true){Toast.makeText(this,"Choose spoken audio first",Toast.LENGTH_LONG).show();return@action}
+            val duration=seconds.text.toString().toDoubleOrNull()
+            val customOn=custom.isChecked
+            val frequency=if(customOn).5+hz.progress*.5 else 40.0
+            val amount=if(customOn)depth.progress/100.0 else .9
+            val config=runCatching{NeuroModulationA.Config(duration?:Double.NaN,frequency,amount).checked()}
+            if(config.isFailure){Toast.makeText(this,config.exceptionOrNull()?.message,Toast.LENGTH_LONG).show();return@action}
+            p.edit().putString("neuro:status","Preparing native Version A…").apply()
+            val i=Intent(this,NeuroModulationService::class.java).apply{
+                action=NeuroModulationService.ACTION_GENERATE
+                putExtra("duration",duration!!);putExtra("frequency",frequency);putExtra("depth",amount)
+            }
+            runCatching{startForegroundService(i)}.onFailure{Toast.makeText(this,it.message,Toast.LENGTH_LONG).show()}
+        }
+        action(run,"■ CANCEL ENCODING"){
+            if(p.getBoolean("neuro:active",false))startService(Intent(this,NeuroModulationService::class.java).apply{action=NeuroModulationService.ACTION_CANCEL})
+        }
+        txt(run,"Master: 96 kHz signed PCM32. Separate PCM16 editions are for listening and the Studio mixer. Exact digital recovery applies only to the untouched master.",10f,cool)
+
+        val out=section(body,"05 — Verified Output & Mixer Handoff")
+        val master=p.getString("neuro:master",null)?.let(::File)
+        val listening=p.getString("neuro:listening",null)?.let(::File)
+        val mixer=p.getString("neuro:mixer",null)?.let(::File)
+        val ready=p.getBoolean("neuro:verified",false) && master?.isFile==true && listening?.isFile==true && mixer?.isFile==true
+        if(ready){
+            txt(out,"✓ MASTER RECOVERY VERIFIED · SOURCE-EXACT PCM16 NORMALIZED SAMPLES",10f,green,true)
+            txt(out,"Master: ${master!!.length()/1024/1024} MB · 96 kHz PCM32 · mono",10f,cool)
+            txt(out,"Studio listening copy: 96 kHz PCM16 · peak target −18 dBFS · NOT REVERSIBLE",10f,cool)
+            action(out,"↓ SAVE PROTECTED VERSION A PCM32 MASTER"){neuroChooseExport(931,"EXP_001_A_Protected_96k_PCM32.wav")}
+            action(out,"↓ SAVE MIXER-READY PCM16 WAV"){neuroChooseExport(932,"EXP_001_A_Mixer_Listening_96k_PCM16.wav")}
+            action(out,"↓ SAVE NORMALIZED SOURCE"){neuroChooseExport(933,"EXP_001_A_Normalized_24k_PCM16.wav")}
+            action(out,"↓ SAVE VERIFICATION MANIFEST"){chooseExport(934,"EXP_001_A_Verification.json")}
+            action(out,"▶ PREVIEW MIXER EDITION"){
+                runCatching{neuroPlayer?.release();neuroPlayer=MediaPlayer().apply{setDataSource(mixer!!.absolutePath);prepare();start()}}
+                    .onFailure{Toast.makeText(this,"Preview unavailable: ${it.message}",Toast.LENGTH_LONG).show()}
+            }
+            action(out,"■ STOP PREVIEW"){neuroPlayer?.runCatching{stop();release()};neuroPlayer=null}
+            action(out,"↗ SEND TO STUDIO · SECONDARY AFFIRMATION","aqua"){
+                p.edit().putString("affirmFrequency",mixer!!.absolutePath).apply();showTab("studio")
+            }
+            action(out,"↗ SEND TO STUDIO · PRIMARY AFFIRMATION","aqua"){
+                p.edit().putString("affirmNormal",mixer!!.absolutePath).apply();showTab("studio")
+            }
+        }else txt(out,"Generate and verify Version A to enable protected exports and Studio mixer transfer.",11f,cool)
+        txt(out,"Digital recoverability is tested from PCM32 bytes; passing through Studio, resampling, gain, headphones or acoustic playback changes the signal and voids that exact recovery guarantee.",9f,cool)
+    }
+    private fun neuroChooseExport(code:Int,name:String){
+        val intent=Intent(Intent.ACTION_CREATE_DOCUMENT).apply{
+            addCategory(Intent.CATEGORY_OPENABLE);type="audio/wav";putExtra(Intent.EXTRA_TITLE,name)
+        }
+        @Suppress("DEPRECATION") startActivityForResult(intent,code)
     }
     private fun buildHypnosis(){
         val b=panel(body,fill=Color.rgb(19,19,34),border=Color.rgb(98,69,157),padding=18)
@@ -794,6 +933,36 @@ class MainActivity : Activity() {
         if(resultCode!=RESULT_OK)return;val uri=data?.data?:return
         runCatching{
             when(requestCode){
+                930->{
+                    // SAF source kept in private storage. Import is off the UI thread for large recordings.
+                    val incoming=uri
+                    val name=runCatching{contentResolver.query(incoming,arrayOf(OpenableColumns.DISPLAY_NAME),null,null,null)?.use{cursor->
+                        if(cursor.moveToFirst())cursor.getString(0) else null
+                    }}.getOrNull()?:"recording.wav"
+                    val extension=Regex("\\.[A-Za-z0-9]{2,6}$").find(name)?.value?:".bin"
+                    p.edit().putString("neuro:status","Importing original audio…").apply()
+                    Thread({
+                        runCatching{
+                            val dest=File(filesDir,"neuro-source"+extension.lowercase(Locale.US))
+                            val tmp=File(filesDir,"neuro-source-upload.partial")
+                            contentResolver.openInputStream(incoming)!!.use{src->tmp.outputStream().buffered(65536).use{src.copyTo(it)}}
+                            require(tmp.length()>44){"Audio input is empty"}
+                            if(dest.exists())require(dest.delete()){"Unable to replace source"}
+                            require(tmp.renameTo(dest)){"Could not finish source import"}
+                            p.edit().putString("neuro:input",dest.absolutePath).putBoolean("neuro:verified",false)
+                                .putString("neuro:status","Original spoken recording imported: ${dest.name}").apply()
+                        }.onFailure{p.edit().putString("neuro:status","Import error: ${it.message}").apply()}
+                        runOnUiThread{if(!isFinishing && activeTab=="neuro")showTab("neuro")}
+                    },"neuro-audio-import").start()
+                }
+                931,932,933->{
+                    val key=when(requestCode){931->"neuro:master";932->"neuro:mixer";else->"neuro:normalized"}
+                    val file=p.getString(key,null)?.let(::File)
+                    require(file?.isFile==true){"Verified export file unavailable"}
+                    contentResolver.openOutputStream(uri,"wt")!!.use{target->file.inputStream().use{it.copyTo(target,65536)}}
+                }
+                934->{val manifest=p.getString("neuro:manifest",null)?:error("No verified manifest")
+                    contentResolver.openOutputStream(uri,"wt")!!.bufferedWriter().use{it.write(manifest)}}
                 923->{contentResolver.openOutputStream(uri,"wt")!!.bufferedWriter().use{it.write(Diagnostics.report().toString(2))}}
                 910->{val script=contentResolver.openInputStream(uri)!!.bufferedReader().use{it.readText()};p.edit().putString("script",script).apply();showTab("hypnosis")}
                 920->{val all=JSONObject(p.getString("namedPresets","{}")?:"{}");contentResolver.openOutputStream(uri,"wt")!!.bufferedWriter().use{it.write(all.toString(2))}}
