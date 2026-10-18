@@ -27,3 +27,6 @@ java -jar /tmp/subgen-hyper-voice-pcm.jar
 
 kotlinc "$K/ScriptParser.kt" "$K/VoiceDirection.kt" "$K/ScriptTimeline.kt" "$K/VoiceSpeed.kt" scripts/test_script_acoustic_contract.kt -include-runtime -d /tmp/subgen-script-acoustic-contract.jar
 java -jar /tmp/subgen-script-acoustic-contract.jar
+# Native NeuroModulation A exact PCM recovery, normalizer, mixer-copy and limits.
+kotlinc "$K/NeuroModulationA.kt" scripts/test_neuro_a.kt -include-runtime -d /tmp/subgen-neuro-a-test.jar
+java -jar /tmp/subgen-neuro-a-test.jar

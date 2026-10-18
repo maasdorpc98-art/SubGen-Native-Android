@@ -7,8 +7,8 @@ android {
         applicationId = "com.subgen.nativeapp.stable"
         minSdk = 29
         targetSdk = 34
-        versionCode = 11
-        versionName = "3.1.1-script-acoustic-contract"
+        versionCode = 12
+        versionName = "3.1.2-neuromodulation-a-native"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     buildTypes {
