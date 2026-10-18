@@ -32,8 +32,9 @@ class NeuroModulationService:Service(){
         cancelled.set(false)
         val prefs=StateStore.prefs(this)
         prefs.edit().putBoolean("neuro:active",true).apply()
-        if(Build.VERSION.SDK_INT>=29)startForeground(ID,note("NeuroModulation native Version A"),ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-        else startForeground(ID,note("NeuroModulation native Version A"))
+        if(Build.VERSION.SDK_INT>=29)startForeground(ID,note("NeuroModulation native encoding"),ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        else startForeground(ID,note("NeuroModulation native encoding"))
+        val selectedMode=intent.getStringExtra("mode")?:"A"
         val requestedDuration=intent.getDoubleExtra("duration",60.0)
         val hz=intent.getDoubleExtra("frequency",40.0)
         val depth=intent.getDoubleExtra("depth",.90)
@@ -43,35 +44,56 @@ class NeuroModulationService:Service(){
                 wake=pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,"SubGen:NeuroA").apply{setReferenceCounted(false);acquire(12*60*1000L)}
                 val path=prefs.getString("neuro:input",null)?:error("Select a spoken recording first")
                 val input=File(path);require(input.isFile){"Source recording missing"}
+                require(selectedMode in setOf("A","B","AB")){"Unknown NeuroModulation mode"}
                 val config=NeuroModulationA.Config(requestedDuration,hz,depth).checked()
                 val source=NativeInputDecoder.prepare(input,::status){cancelled.get()}
-                val normalized=File(filesDir,"neuro-a-normalized-24k.wav")
-                val master=File(filesDir,"neuro-a-protected-96k-pcm32.wav")
-                val listening=File(filesDir,"neuro-a-listening-96k-pcm16.wav")
-                status("Preparing normalized 24kHz mono source…")
+                val normalized=File(filesDir,"neuro-original-normalized-24k.wav")
+                status("Preparing normalized 24 kHz mono source…")
                 val frames=NeuroModulationA.normalize(source,normalized,::status){cancelled.get()}
-                status("Encoding native A · $frames original normalized samples")
-                val report=NeuroModulationA.generate(normalized,master,listening,config,::status){cancelled.get()}
-                val mixer=File(filesDir,"neuro-a-mixer-96k-pcm16.wav")
-                status("Preparing separate Studio-friendly listening copy…")
-                NeuroModulationA.createMixerCopy(master,mixer,report.peakDbfs){cancelled.get()}
-                val manifest=JSONObject().put("mode","A").put("algorithm","Experiment 001 direct integer 40Hz AM")
-                    .put("normalizedPcm16Sha256",report.sha256)
-                    .put("sourceSamples",report.sourceFrames).put("recoveredSourceSamples",report.recoveredFrames)
-                    .put("masterRate",96000).put("masterChannels",1).put("masterBits",32)
-                    .put("durationSeconds",report.outputFrames/96000.0)
-                    .put("modulationHz",hz).put("depth",depth)
-                    .put("peakDbfs",report.peakDbfs).put("recoveryPass",true)
-                    .put("warning","Recovery applies to unchanged PCM32 master only; not listening copy or Studio mix")
-                File(filesDir,"neuro-a-verification.json").writeText(manifest.toString(2))
-                prefs.edit().putString("neuro:master",master.absolutePath)
-                    .putString("neuro:listening",listening.absolutePath)
-                    .putString("neuro:mixer",mixer.absolutePath)
-                    .putString("neuro:normalized",normalized.absolutePath)
-                    .putString("neuro:manifest",manifest.toString())
-                    .putBoolean("neuro:verified",true).apply()
-                Diagnostics.record("NEURO_A_VERIFIED","",manifest)
-                status("VERIFIED · ${report.recoveredFrames} source samples recovered exactly · ${"%.1f".format(java.util.Locale.US,report.outputFrames/96000.0)}s")
+                val versions=if(selectedMode=="AB")listOf("A","B") else listOf(selectedMode)
+                // Fail-closed on each verification; retaining separately verified earlier versions.
+                for(version in versions){
+                    if(cancelled.get())throw InterruptedException("NeuroModulation cancelled")
+                    status("Generating $version · ${versions.indexOf(version)+1} / ${versions.size} · $frames source samples")
+                    val master=File(filesDir,"neuro-${version.lowercase()}-protected-96k-pcm32.wav")
+                    val mixer=File(filesDir,"neuro-${version.lowercase()}-mixer-96k-pcm16.wav")
+                    prefs.edit().putBoolean("neuro:verified:$version",false).apply()
+                    val manifest=if(version=="A"){
+                        val directListening=File(filesDir,"neuro-a-listening-96k-pcm16.wav")
+                        val info=NeuroModulationA.generate(normalized,master,directListening,config,::status){cancelled.get()}
+                        status("Preparing independent Version A mixer edition…")
+                        NeuroModulationA.createMixerCopy(master,mixer,info.peakDbfs){cancelled.get()}
+                        JSONObject().put("algorithm","Experiment 001 A, source × integer positive AM envelope")
+                            .put("sourceSamples",info.sourceFrames).put("recoveredSamples",info.recoveredFrames)
+                            .put("normalizedPcm16Sha256",info.sha256).put("pcmBits",32).put("channels",1)
+                            .put("outputFrames",info.outputFrames).put("peakDbfs",info.peakDbfs)
+                    }else{
+                        val info=NeuroModulationB.generate(normalized,master,config,::status){cancelled.get()}
+                        status("Preparing Version B independent PCM16 mixer edition…")
+                        NeuroModulationB.createMixerCopy(master,mixer){cancelled.get()}
+                        JSONObject().put("algorithm","Experiment 001 B, 3-tone speech predictor, XZ correction, stereo 2048-point OFDM and 22-bit QAM")
+                            .put("sourceSamples",info.sourceSamples).put("recoveredSamples",info.recoveredSamples)
+                            .put("normalizedPcm16Sha256",info.pcmSha256).put("pcmBits",32).put("channels",2)
+                            .put("outputFrames",info.frames).put("peakDbfs",info.peakDbfs)
+                            .put("decodeScale",info.scale).put("packetBytes",info.payloadBytes)
+                            .put("ofdmCapacityBytes",info.capacityBytes)
+                    }
+                    require(master.isFile && mixer.isFile){"Version $version protected output or mixer file missing"}
+                    manifest.put("mode",version).put("masterRate",96000)
+                        .put("durationSeconds",requestedDuration).put("modulationHz",hz).put("depth",depth)
+                        .put("recoveryPass",true)
+                        .put("mixerEdition","96kHz mono PCM16 · not digitally recoverable")
+                        .put("warning","Exact recovery applies only to unchanged PCM32 master; never to listening mix, headphones or air.")
+                    File(filesDir,"neuro-$version-verification.json").writeText(manifest.toString(2))
+                    prefs.edit().putString("neuro:master:$version",master.absolutePath)
+                        .putString("neuro:mixer:$version",mixer.absolutePath)
+                        .putString("neuro:normalized",normalized.absolutePath)
+                        .putString("neuro:manifest:$version",manifest.toString())
+                        .putBoolean("neuro:verified:$version",true).apply()
+                    Diagnostics.record("NEURO_${version}_VERIFIED","",manifest)
+                    status("VERSION $version VERIFIED · independently recovered every normalized PCM16 sample")
+                }
+                status("DONE · ${versions.joinToString(" + ")} digitally verified · Open Section 05 to save, preview or send to Studio")
             }catch(e:Throwable){
                 Diagnostics.failure("NEURO_A_GENERATION_FAILED",e)
                 status(if(cancelled.get())"Cancelled; previous completed output retained" else "FAILED · ${e.message?:e.javaClass.simpleName}")
@@ -90,7 +112,7 @@ class NeuroModulationService:Service(){
         val i=Intent(this,MainActivity::class.java)
         val pending=PendingIntent.getActivity(this,3,i,PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         return Notification.Builder(this,CHANNEL).setSmallIcon(android.R.drawable.ic_media_play)
-            .setContentTitle("NeuroModulation · Version A").setContentText(value).setOngoing(true).setContentIntent(pending).build()
+            .setContentTitle("NeuroModulation · A / B / A+B").setContentText(value).setOngoing(true).setContentIntent(pending).build()
     }
     override fun onDestroy(){executor.shutdown();super.onDestroy()}
     companion object {

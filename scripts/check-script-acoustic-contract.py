@@ -11,5 +11,5 @@ assert 'explicitPhaseMode' in voice and 'node.acousticPhase' in voice
 assert 'n.scriptProfile!=null' in service
 assert 'scriptProfile=null,acousticPhase=null,explicitPhaseMode=true' in service
 assert '[profile MASTER_HYPNOTIST]' in ui and '[phase DEEPENER]' in ui
-assert 'versionCode = 12' in (root/'app/build.gradle.kts').read_text()
+assert 'versionCode = 13' in (root/'app/build.gradle.kts').read_text()
 print('PASS: script-selected native acoustic control, cache isolation and neutral audition wiring')

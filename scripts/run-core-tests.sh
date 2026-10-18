@@ -30,3 +30,6 @@ java -jar /tmp/subgen-script-acoustic-contract.jar
 # Native NeuroModulation A exact PCM recovery, normalizer, mixer-copy and limits.
 kotlinc "$K/NeuroModulationA.kt" scripts/test_neuro_a.kt -include-runtime -d /tmp/subgen-neuro-a-test.jar
 java -jar /tmp/subgen-neuro-a-test.jar
+# Reference-derived Version B predictor/XZ+stereo OFDM/QAM source recovery.
+kotlinc "$K/NeuroModulationA.kt" "$K/NeuroModulationB.kt" scripts/test_neuro_b.kt tests/xz/XzStub.kt -include-runtime -d /tmp/subgen-neuro-b-test.jar
+java -jar /tmp/subgen-neuro-b-test.jar
