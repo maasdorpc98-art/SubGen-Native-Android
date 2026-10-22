@@ -182,7 +182,8 @@ class RenderService:Service() {
     private fun runJob(){
         Diagnostics.stage("HYPNOSIS_PREPARE")
         val prefs=StateStore.prefs(this)
-        val script=prefs.getString("script", "")?.trim().orEmpty()
+        val submittedScript=prefs.getString("script", "").orEmpty()
+        val script=submittedScript.trim()
         require(script.isNotEmpty()){ "Enter a Hypnosis script first" }
         StateStore.active(this,true)
         val voice=prefs.getString("voice","SERENA")?:"SERENA"
@@ -192,12 +193,15 @@ class RenderService:Service() {
         var threads=InferenceTuner.threads(this)
         Diagnostics.record("SPEED_ENGINE","FP32 + adaptive inference workers + cache-first pipeline")
         val name=prefs.getString("name","Hypnosis Session")?:"Hypnosis Session"
-        val rawNodes=ScriptParser.parse(script,prefs.getFloat("hyp:breatheSec",5f).toDouble(),prefs.getFloat("hyp:paragraphSec",3f).toDouble(),maxSpeechChars=160)
+        val breathe=prefs.getFloat("hyp:breatheSec",5f).toDouble()
+        val paragraph=prefs.getFloat("hyp:paragraphSec",3f).toDouble()
+        val rawNodes=ScriptParser.parse(script,breathe,paragraph,maxSpeechChars=160)
         val unknown=rawNodes.filterIsInstance<ScriptNode.Unknown>()
         require(unknown.isEmpty()){
             "Unsupported audio or HYPER planner code: "+unknown.take(3).joinToString {it.command}
         }
         val direction=VoiceDirectionStore.read(prefs)
+        val hyperAcoustics=HyperStore.acoustics(voice,HyperAnalysis.Settings(speed,breathe,paragraph,direction))
         val nodes=rawNodes.map { node->
             if(node is ScriptNode.Speech) {
                 val r=VoiceDirection.resolve(node,speed,direction)
@@ -313,8 +317,8 @@ class RenderService:Service() {
         val requestedRate=prefs.getInt("hyp:sampleRate",24000)
         require(requestedRate in OutputFormat.rates){"Unsupported output sample rate"}
         // Binaural separation requires stereo. Keep the stored preference unchanged.
-        val sec=WavIO.assemble(nodes,checkpointFiles,path,
-            binOn=(prefs.getBoolean("binaural",false) && outChannels==2))
+        val binaural=(prefs.getBoolean("binaural",false) && outChannels==2)
+        val sec=WavIO.assemble(nodes,checkpointFiles,path,binOn=binaural)
         Diagnostics.record("WAV_ASSEMBLY_COMPLETED","",org.json.JSONObject()
             .put("elapsedMs",SystemClock.elapsedRealtime()-assembleStart)
             .put("durationSeconds",sec).put("bytes",path.length()))
@@ -323,9 +327,9 @@ class RenderService:Service() {
         Diagnostics.stage("HYPNOSIS_OUTPUT_FORMAT")
         val finalPath=File(filesDir,"hypnosis-final.wav")
         val formatStart=SystemClock.elapsedRealtime()
-        val formatted=OutputFormat.convert(path,finalPath,requestedRate,outChannels,
-            volumeDb=prefs.getFloat("hyp:outputDb",0f).toDouble().coerceIn(-30.0,12.0),
-            ceilingDb=prefs.getFloat("hyp:peakDb",-1f).toDouble().coerceIn(-12.0,0.0))
+        val outputDb=prefs.getFloat("hyp:outputDb",0f).toDouble().coerceIn(-30.0,12.0)
+        val ceilingDb=prefs.getFloat("hyp:peakDb",-1f).toDouble().coerceIn(-12.0,0.0)
+        val formatted=OutputFormat.convert(path,finalPath,requestedRate,outChannels,volumeDb=outputDb,ceilingDb=ceilingDb)
         Diagnostics.record("WAV_OUTPUT_FORMAT_COMPLETED","",org.json.JSONObject()
             .put("elapsedMs",SystemClock.elapsedRealtime()-formatStart)
             .put("sampleRate",formatted.rate).put("channels",formatted.channels)
@@ -348,6 +352,10 @@ class RenderService:Service() {
             if(nodes[i] is ScriptNode.Speech) WavIO.loadMono(checkpointFiles[i]!!).frames else 0L
         }
         prefs.edit().putLong("hyp:lastVoiceFrames",voiceFrames).apply()
+        runCatching{HyperStore.recordRender(this,submittedScript,hyperAcoustics,
+            HyperStore.output(formatted.rate,formatted.channels,outputDb,ceilingDb,binaural),rawNodes,
+            (formatted.bytes-44L)/(formatted.channels*2),formatted.rate)
+        }.onFailure{Diagnostics.failure("HYPER_RENDER_EVIDENCE_FAILED",it)}
     }
     private fun update(message:String){Diagnostics.progress(message);StateStore.status(this,message);(getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(ID,notification(message))}
     private fun notification(message:String):Notification {

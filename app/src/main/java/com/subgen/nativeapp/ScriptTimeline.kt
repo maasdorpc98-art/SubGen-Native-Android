@@ -22,7 +22,13 @@ object ScriptTimeline {
                 spoken++
                 val count=node.text.split(Regex("\\s+")).count{it.isNotBlank()}
                 words+=count
-                val resolved=VoiceDirection.resolve(node,speed,direction)
+                val result=runCatching{VoiceDirection.resolve(node,speed,direction)}
+                val resolved=result.getOrNull()
+                if(resolved==null){
+                    invalid++
+                    rows+=Row(at,"ERROR","Invalid effective acoustic setting: "+result.exceptionOrNull()?.message)
+                    return@forEach
+                }
                 // 145 WPM at 1x is a heuristic; neural PCM remains authoritative.
                 val seconds=count*60.0/(145.0*resolved.speed.toDouble())
                 rows+=Row(at,"SPEECH",String.format(Locale.US,"%s · %.2fx · %+.1f dB · %s",

@@ -39,12 +39,20 @@ object ScriptParser {
     private val sentenceEnd=Regex("(?<=[.!?…])\\s+")
     private val planner=Regex("^@[A-Za-z][A-Za-z_0-9]*(?:\\([^\\n)]*\\))?")
 
-    fun parse(script:String,breathe:Double=5.0,paragraph:Double=3.0,maxSpeechChars:Int=440):List<ScriptNode> {
+    fun parse(script:String,breathe:Double=5.0,paragraph:Double=3.0,maxSpeechChars:Int=440,
+              onControl:((String,Int,Int)->Unit)?=null,
+              onNode:((ScriptNode,List<Int>)->Unit)?=null):List<ScriptNode> {
         require(maxSpeechChars>=16){"Speech chunk limit must be at least 16"}
         require(breathe.isFinite()&&breathe in 0.0..MAX_PAUSE_SECONDS){"Invalid breathing pause"}
         require(paragraph.isFinite()&&paragraph in 0.0..MAX_PAUSE_SECONDS){"Invalid paragraph pause"}
         val nodes=mutableListOf<ScriptNode>()
         val speech=StringBuilder()
+        val sourceOffsets=mutableListOf<Int>()
+        var commandStart=0;var commandEnd=0
+        var normalizedOffsets:List<Int> = emptyList()
+        var normalizedText="";var mappedThrough=0
+        fun emit(node:ScriptNode){nodes+=node;onNode?.invoke(node,(commandStart until commandEnd).toList())}
+        fun append(c:Char,offset:Int){speech.append(c);if(onNode!=null)sourceOffsets+=offset}
         var delivery="NORMAL"
         var activeTempo:Double?=null
         var activeGain:Double?=null
@@ -54,12 +62,32 @@ object ScriptParser {
         var acousticPhase:String?=null
         var explicitPhaseMode=false
         fun push(text:String) {
-            if(text.isNotBlank())nodes+=ScriptNode.Speech(text.trim(),delivery,activeTempo,activeGain,activeSection,
-                scriptProfile,acousticPhase,explicitPhaseMode,lastLegacyPhase)
+            if(text.isNotBlank()){
+                val value=text.trim()
+                val node=ScriptNode.Speech(value,delivery,activeTempo,activeGain,activeSection,
+                    scriptProfile,acousticPhase,explicitPhaseMode,lastLegacyPhase)
+                nodes+=node
+                if(onNode!=null){
+                    val start=normalizedText.indexOf(value,mappedThrough)
+                    check(start>=0){"Analysis trace lost speech alignment"}
+                    onNode(node,normalizedOffsets.subList(start,start+value.length).toList())
+                    mappedThrough=start+value.length
+                }
+            }
         }
         fun flush() {
-            val raw=speech.toString().trim().replace(Regex("\\s+")," ")
-            speech.clear()
+            val original=speech.toString()
+            val raw=original.trim().replace(Regex("\\s+")," ")
+            if(onNode!=null){
+                val offsets=mutableListOf<Int>()
+                Regex("\\S+").findAll(original).forEach { word->
+                    if(offsets.isNotEmpty())offsets+=sourceOffsets[word.range.first-1]
+                    for(at in word.range)offsets+=sourceOffsets[at]
+                }
+                normalizedText=raw;normalizedOffsets=offsets.toList();mappedThrough=0
+                check(raw.length==normalizedOffsets.size)
+            }
+            speech.clear();sourceOffsets.clear()
             if(raw.isEmpty())return
             var pending=""
             fun commit(){push(pending);pending=""}
@@ -88,53 +116,54 @@ object ScriptParser {
             val pr=profile.matchEntire(inside)
             val ph=phase.matchEntire(inside)
             when {
-                m!=null->{flush();delivery=m.groupValues[1].uppercase();nodes+=ScriptNode.DeliveryChange(delivery)}
+                m!=null->{flush();delivery=m.groupValues[1].uppercase();emit(ScriptNode.DeliveryChange(delivery))}
                 s!=null->{flush();val declared=s.groupValues[1].trim()
-                    if(declared.isEmpty())nodes+=ScriptNode.Unknown(token)
+                    if(declared.isEmpty())emit(ScriptNode.Unknown(token))
                     else {
-                        nodes+=ScriptNode.Section(declared)
+                        emit(ScriptNode.Section(declared))
                         val code=declared.uppercase()
                         activeSection=declared
                         if(listOf("ARRIVAL","INDUCTION","DEEPENER","FRACTIONATION","SUGGESTION","REINFORCEMENT","INTEGRATION","WAKE","SLEEP","VOID","DEEP TRANCE").any{code.startsWith(it)})
                             lastLegacyPhase=declared // old projects retain known-section mapping only
                     }}
                 p!=null->{flush();val value=p.groupValues[1].toDoubleOrNull()
-                    if(value==null||!value.isFinite()||value>MAX_PAUSE_SECONDS)nodes+=ScriptNode.Unknown(token)
-                    else nodes+=ScriptNode.Pause(value)}
-                inside.equals("breathe",true)->{flush();nodes+=ScriptNode.Pause(breathe)}
-                inside.equals("paragraph",true)->{flush();nodes+=ScriptNode.Pause(paragraph)}
+                    if(value==null||!value.isFinite()||value>MAX_PAUSE_SECONDS)emit(ScriptNode.Unknown(token))
+                    else emit(ScriptNode.Pause(value))}
+                inside.equals("breathe",true)->{flush();emit(ScriptNode.Pause(breathe))}
+                inside.equals("paragraph",true)->{flush();emit(ScriptNode.Pause(paragraph))}
                 t!=null->{flush();val arg=t.groupValues[1].trim()
                     if(arg.equals("reset",true))activeTempo=null
                     else {val value=if(realNumber.matches(arg))arg.toDoubleOrNull() else null
-                        if(value==null||!value.isFinite()||value !in 0.65..1.50)nodes+=ScriptNode.Unknown(token)
+                        if(value==null||!value.isFinite()||value !in 0.65..1.50)emit(ScriptNode.Unknown(token))
                         else activeTempo=value}}
                 v!=null->{flush();val arg=v.groupValues[1].trim()
                     if(arg.equals("reset",true))activeGain=null
                     else {val value=if(signedDb.matches(arg))arg.dropLast(2).toDoubleOrNull() else null
-                        if(value==null||!value.isFinite()||value !in -18.0..6.0)nodes+=ScriptNode.Unknown(token)
+                        if(value==null||!value.isFinite()||value !in -18.0..6.0)emit(ScriptNode.Unknown(token))
                         else activeGain=value}}
                 pr!=null->{flush();val name=pr.groupValues[1].trim().uppercase()
                     if(name=="RESET"){
                         scriptProfile=null;explicitPhaseMode=true
-                        nodes+=ScriptNode.ProfileChange("RESET")
+                        emit(ScriptNode.ProfileChange("RESET"))
                     } else {
                         val selected=PROFILE_CODES[name]
-                        if(selected==null)nodes+=ScriptNode.Unknown(token)
+                        if(selected==null)emit(ScriptNode.Unknown(token))
                         else {scriptProfile=selected;explicitPhaseMode=true
-                            nodes+=ScriptNode.ProfileChange(name)}
+                            emit(ScriptNode.ProfileChange(name))}
                     }}
                 ph!=null->{flush();val name=ph.groupValues[1].trim().uppercase()
                     if(name=="RESET"){
                         acousticPhase=null;explicitPhaseMode=true
-                        nodes+=ScriptNode.PhaseChange("RESET")
+                        emit(ScriptNode.PhaseChange("RESET"))
                     } else if(name in ACOUSTIC_PHASES){
                         acousticPhase=name;explicitPhaseMode=true
-                        nodes+=ScriptNode.PhaseChange(name)
-                    } else nodes+=ScriptNode.Unknown(token)}
+                        emit(ScriptNode.PhaseChange(name))
+                    } else emit(ScriptNode.Unknown(token))}
                 // Unknown likely command: never let typos such as [pauze 2] reach Kokoro.
-                Regex("^(?:pause|pauze|tempo|volume|profile|phase|gain|speed|delivery|section|stage|breathe|paragraph|slow|soft|whisper|normal)\\b.*",RegexOption.IGNORE_CASE).matches(inside)->{flush();nodes+=ScriptNode.Unknown(token)}
+                Regex("^(?:pause|pauze|tempo|volume|profile|phase|gain|speed|delivery|emotion|pitch|voice|repeat|section|stage|breathe|paragraph|slow|soft|whisper|normal)\\b.*",RegexOption.IGNORE_CASE).matches(inside)->{flush();emit(ScriptNode.Unknown(token))}
                 else->return false // ordinary bracketed narration, e.g. [the door opens]
             }
+            onControl?.invoke(token,commandStart,commandEnd)
             return true
         }
         var i=0
@@ -142,20 +171,27 @@ object ScriptParser {
             val c=script[i]
             if(c=='\\'&&i+1<script.length&&script[i+1]=='['){
                 // Explicit literal escape. Keep the complete bracket phrase as spoken text.
-                speech.append('[');i+=2;continue
+                append('[',i+1);i+=2;continue
             }
             if(c=='['){
                 val end=script.indexOf(']',i+1)
+                commandStart=i;commandEnd=end+1
                 if(end>i && end-i<=162 && handle(script.substring(i,end+1))){i=end+1;continue}
+                if((end<0||end-i>162||script.substring(i,end.coerceAtLeast(i)).contains('\n'))&&
+                    Regex("^\\[\\s*(?:pause|pauze|tempo|volume|profile|phase|gain|speed|delivery|emotion|pitch|voice|repeat|section|stage|breathe|paragraph|slow|soft|whisper|normal)\\b",RegexOption.IGNORE_CASE)
+                        .containsMatchIn(script.substring(i))){
+                    val lineEnd=script.indexOf('\n',i).let{if(it<0)script.length else it}
+                    commandStart=i;commandEnd=lineEnd;flush();emit(ScriptNode.Unknown(script.substring(i,lineEnd)));i=lineEnd;continue
+                }
             }
             if(c=='@'&&(i==0||!script[i-1].isLetterOrDigit())){
                 val plannerToken=planner.find(script.substring(i))?.takeIf{it.range.first==0}
-                if(plannerToken!=null){flush();nodes+=ScriptNode.Unknown(plannerToken.value);i+=plannerToken.value.length;continue}
+                if(plannerToken!=null){commandStart=i;commandEnd=i+plannerToken.value.length;flush();emit(ScriptNode.Unknown(plannerToken.value));i+=plannerToken.value.length;continue}
             }
             // Text remains continuous across ordinary newlines. Exact pauses come from codes.
             if(c=='\n'||c=='\r'||c=='\t'){
-                if(speech.isNotEmpty()&&!speech.last().isWhitespace())speech.append(' ')
-            } else speech.append(c)
+                if(speech.isNotEmpty()&&!speech.last().isWhitespace())append(' ',i)
+            } else append(c,i)
             i++
         }
         flush()
