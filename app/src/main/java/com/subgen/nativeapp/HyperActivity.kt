@@ -37,7 +37,8 @@ class HyperActivity:Activity() {
     private val purple=Color.rgb(188,165,255)
     private fun dp(n:Int)=(n*resources.displayMetrics.density).roundToInt()
     private fun source()=prefs.getString("script","")?:""
-    override fun onCreate(state:Bundle?){super.onCreate(state);window.statusBarColor=Color.rgb(15,19,24);window.navigationBarColor=Color.rgb(15,19,24);show("Audit")}
+    override fun onCreate(state:Bundle?){super.onCreate(state);window.statusBarColor=Color.rgb(15,19,24);window.navigationBarColor=Color.rgb(15,19,24);pendingExport=state?.getString("pendingExport")?.let(::File);show(state?.getString("page")?:"Audit")}
+    override fun onSaveInstanceState(outState:Bundle){outState.putString("page",page);outState.putString("pendingExport",pendingExport?.absolutePath);super.onSaveInstanceState(outState)}
     override fun onDestroy(){player?.release();player=null;worker.shutdownNow();super.onDestroy()}
     private fun label(parent:LinearLayout,s:String,size:Float=13f,color:Int=white):TextView=TextView(this).apply{
         text=s;textSize=size;setTextColor(color);setPadding(0,dp(8),0,dp(8));setTextIsSelectable(true)
@@ -57,10 +58,10 @@ class HyperActivity:Activity() {
         return Spinner(this).apply{adapter=ArrayAdapter(this@HyperActivity,android.R.layout.simple_spinner_dropdown_item,values)
             setSelection(values.indexOf(current).coerceAtLeast(0));parent.addView(this,LinearLayout.LayoutParams(-1,dp(48)))}
     }
-    private fun error(t:Throwable){if(!isFinishing)AlertDialog.Builder(this).setTitle("Production tools").setMessage(t.message?:t.javaClass.simpleName).setPositiveButton("Close",null).show()}
+    private fun error(t:Throwable){if(!isFinishing&&!isDestroyed)AlertDialog.Builder(this).setTitle("Production tools").setMessage(t.message?:t.javaClass.simpleName).setPositiveButton("Close",null).show()}
     private fun background(message:String,work:()->Unit){
         check(!busy){"A production check is already running"};busy=true;status.text=message
-        worker.execute{val result=runCatching{work()};runOnUiThread{busy=false;if(!isFinishing){result.onFailure{error(it)};show(page)}}}
+        worker.execute{val result=runCatching{work()};runOnUiThread{busy=false;if(!isFinishing&&!isDestroyed){result.onFailure{error(it)};show(page)}}}
     }
     private fun audit():HyperAnalysis.Result=store.analyze(source()).also{lastAudit=it}
     private fun show(name:String){
@@ -184,7 +185,7 @@ class HyperActivity:Activity() {
     private fun audio(){
         label(body,"Measured WAV / Loop QA",18f,purple)
         label(body,"Read-only measurements of the completed WAV. No crossfade, gain correction, silence removal or pacing changes. RMS and zero crossings are limited technical indicators.",12f,muted)
-        button(body,"Measure completed WAV"){background("Measuring WAV frames, levels, silence and seam…"){store.measure()}}
+        button(body,"Measure completed WAV"){background("Measuring WAV frames, levels, silence and seam…"){store.measure{Thread.currentThread().isInterrupted}}}
         val a=audit();val id=store.identity(a);val qa=store.measurements()
         if(qa!=null){label(body,qa.toString(2),12f);if(id.audioHash.isBlank())label(body,"These measurements are historical or do not match current script/settings. New relevant review is required.",13f,Color.rgb(255,175,120))
             else label(body,"Measured − estimated duration: ${"%+.3f".format(qa.getDouble("measuredDurationSeconds")-a.totalSeconds)} s",14f,purple)}
@@ -192,16 +193,16 @@ class HyperActivity:Activity() {
         button(body,"Play original single cycle"){play(File(filesDir,"hypnosis-final.wav"))}
         fun audition(label:String){button(body,label){background("Preparing original tail → head audition window…"){
             val out=File(cacheDir,"hyper-junction.wav");HyperAudioQa.audition(File(filesDir,"hypnosis-final.wav"),out)
-            runOnUiThread{if(!isFinishing)play(out)}
+            runOnUiThread{if(!isFinishing&&!isDestroyed)play(out)}
         }}}
         audition("Audition A → B junction (last 2s + first 2s)");audition("Audition B → C junction (same repeated PCM boundary)")
         button(body,"Play exact three-cycle test"){background("Streaming three unmodified cycles to a temporary WAV…"){
             val out=File(cacheDir,"hyper-three-cycle.wav");if(out.exists())out.delete();HyperAudioQa.exportCycles(File(filesDir,"hypnosis-final.wav"),out,stop={Thread.currentThread().isInterrupted})
-            runOnUiThread{if(!isFinishing)play(out)}
+            runOnUiThread{if(!isFinishing&&!isDestroyed)play(out)}
         }}
         button(body,"Export three-cycle QA WAV"){background("Preparing three-cycle export; original remains available…"){
             val out=File(cacheDir,"hyper-three-cycle-export.wav");if(out.exists())out.delete();HyperAudioQa.exportCycles(File(filesDir,"hypnosis-final.wav"),out,stop={Thread.currentThread().isInterrupted})
-            runOnUiThread{if(!isFinishing)export(out,"audio/wav")}
+            runOnUiThread{if(!isFinishing&&!isDestroyed)export(out,"audio/wav")}
         }}
         button(body,"Stop playback"){player?.release();player=null}
         label(body,"Manual seam approval is recorded under Reviews / Reports. A technically smooth waveform does not verify the narrative junction.",12f,muted)
@@ -237,7 +238,7 @@ class HyperActivity:Activity() {
         val a=audit();val id=store.identity(a);val rs=store.reviews();val s=HyperGovernance.state(id,rs,a.technicalErrors,a.warnings,a.mode.ending=="LOOP")
         label(body,"${s.technical}\n${s.editorial} · ${s.audio}\n${s.listener} · ${s.release}",17f,purple)
         label(body,"Approvals bind exact script, rules, mode, session cues and acoustic settings. Audio reviews also bind render configuration, WAV hash and a unique render ID.",12f,muted)
-        val items=listOf("Induction quality","Meaningful first response","Distinct deepeners","Sustained hypnotic development","Cue preparation","Cue continuation","Objective coherence","Sensory / cognitive immersion","Voice and pacing","Appropriate ending","Loop continuity","Listener comfort")
+        val items=listOf("Induction quality","Meaningful first response","Distinct deepeners","Fractionation contrast / renewed inward absorption","Sustained hypnotic development","Cue preparation","Cue continuation","Objective coherence","Sensory / cognitive immersion","Voice and pacing","Appropriate ending","Loop continuity","Listener comfort")
         items.forEach{item->button(body,"Review · $item"){
             AlertDialog.Builder(this).setTitle(item).setItems(arrayOf("Accepted","Needs revision","Not applicable","Exception approved")){_,choice->
                 if(choice==3){val findings=a.findings.filter{it.allowException};AlertDialog.Builder(this).setTitle("Select the relevant rule")

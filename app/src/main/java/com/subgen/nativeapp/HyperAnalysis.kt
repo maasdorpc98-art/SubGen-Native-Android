@@ -189,7 +189,9 @@ object HyperAnalysis {
         val objective=passages.firstOrNull{it.role=="OBJECTIVE"}
         if(objective!=null){
             val renewed=passages.filter{it.at>=objective.at&&it.role in setOf("RENEWED_DEEPENING","DEEPENER")}
-            if(renewed.isEmpty()&&at-objective.at>rules.objectiveGapSeconds)finding("RENEWED_DEPTH","Long objective work without labelled renewed deepening.",objective.source)
+            (listOf(objective.at)+renewed.map{it.at}.distinct()+at).zipWithNext().filter{it.second-it.first>rules.objectiveGapSeconds}.forEach{gap->
+                finding("RENEWED_DEPTH","Long objective passage without labelled renewed deepening near ${ScriptTimeline.time(gap.first)}; review unlabelled guidance.",passages.firstOrNull{it.at>=gap.first}?.source?:objective.source)
+            }
         }
         val fractionation=passages.filter{it.role=="FRACTIONATION"||it.phase=="FRACTIONATION"}.distinctBy{it.section.ifEmpty{it.source.start.toString()}}
         if(mode.architecture=="FOUNDATION"&&mode.ending!="SLEEP"&&fractionation.size<rules.foundationCycles)

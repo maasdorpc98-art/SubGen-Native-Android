@@ -19,3 +19,7 @@ if [[ ! -s "$XZ_JAR" ]]; then
 fi
 kotlinc "$K/NeuroModulationA.kt" "$K/NeuroModulationB.kt" scripts/test_neuro_b.kt -cp "$XZ_JAR" -include-runtime -d /tmp/subgen-real-xz-neuro-b.jar
 java -cp "/tmp/subgen-real-xz-neuro-b.jar:$XZ_JAR" Test_neuro_bKt | tee test-results/NEURO-B-REAL-XZ.txt
+kotlinc "$K/ScriptParser.kt" "$K/ScriptSourceMap.kt" "$K/ScriptTimeline.kt" "$K/VoiceDirection.kt" "$K/VoiceSpeed.kt" \
+  "$K/HyperAnalysis.kt" "$K/HyperAudioQa.kt" "$K/HyperGovernance.kt" "$K/HyperJson.kt" "$K/HyperStore.kt" "$K/VoiceDirectionStore.kt" \
+  tests/storage-stubs/*.kt scripts/test_hyper_store.kt -cp "$JSON_JAR" -include-runtime -d /tmp/subgen-hyper-storage-tests.jar
+java -Xmx512m -cp "/tmp/subgen-hyper-storage-tests.jar:$JSON_JAR" Test_hyper_storeKt | tee test-results/STORAGE-INTEGRATION.txt

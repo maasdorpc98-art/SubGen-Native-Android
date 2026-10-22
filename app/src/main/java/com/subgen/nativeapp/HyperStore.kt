@@ -60,11 +60,11 @@ class HyperStore(private val context:Context) {
             HyperJson.canonical(HyperJson.array(a.cues.map{HyperJson.cue(it)})),acoustics,output,
             if(bound)qa!!.getString("sha256")else "",if(bound)render!!.getString("renderId")else "")
     }
-    fun measure():JSONObject {
+    fun measure(stop:()->Boolean={false}):JSONObject {
         val render=render()?:error("Render a WAV in Hypnosis first")
         val file=File(context.filesDir,"hypnosis-final.wav");require(file.isFile){"Completed WAV unavailable"}
         val id=render.getString("renderId");val modified=file.lastModified();val bytes=file.length()
-        val audio=HyperJson.audio(HyperAudioQa.analyze(file)).put("renderId",id).put("scriptSha256",render.getString("scriptSha256"))
+        val audio=HyperJson.audio(HyperAudioQa.analyze(file,stop)).put("renderId",id).put("scriptSha256",render.getString("scriptSha256"))
             .put("fileBytes",bytes).put("modifiedAt",modified)
         require(render()?.getString("renderId")==id&&file.lastModified()==modified&&file.length()==bytes){"Render changed during analysis"}
         atomic(File(directory,"latest-audio-qa.json"),audio.toString(2));return audio

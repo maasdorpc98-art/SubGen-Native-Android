@@ -76,9 +76,10 @@ fun main(){
         check(a.passages.all{abs(it.speed-.88)<1e-6&&it.gainDb == -2.0&&it.phase=="DEEPENER"})
     }
     verify("Malformed commands, unsupported profile/phase, authoring instructions are technical errors"){
-        for(code in listOf("[tempo 0.1]","[volume -99dB]","[phase UNKNOWN]","[profile UNKNOWN]","@CEMENT(test)","[pause -2]","[emotion happy]","[pitch 2]","[voice test]"))
+        for(code in listOf("[tempo 0.1]","[volume -99dB]","[phase UNKNOWN]","[profile UNKNOWN]","@CEMENT(test)","[pause -2]","[emotion happy]","[pitch 2]","[voice test]","[tempo 0.9","[pause\n2]"))
             check(analyze("$code Hello.").technicalErrors>0){code}
         check(analyze("[tempo 1.5]Hello.").technicalErrors>0)
+        check(ScriptTimeline.analyze("[tempo 1.5]Hello.").invalidCommands==1)
         check(analyze("[the door opens] Hello.").technicalErrors==0)
         check(analyze("<!-- note -->Hello.").findings.any{it.rule=="SPOKEN_COMMENT"})
     }

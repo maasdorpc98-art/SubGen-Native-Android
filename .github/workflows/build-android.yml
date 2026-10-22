@@ -62,9 +62,10 @@ jobs:
       - name: Verify Android APK signature and arm64 runtime
         run: |
           test -s app/build/outputs/apk/debug/app-debug.apk
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/debug/app-debug.apk | tee test-results/DEBUG-APK-SIGNATURE.txt
           unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libsherpa-onnx-jni.so'
           sha256sum app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk > test-results/DEBUG-APK-IDENTITY.txt
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
@@ -84,6 +85,9 @@ jobs:
           cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" "$RUNNER_TEMP/subgen-offline-signing/apksigner.jar"
           cp "$ANDROID_HOME/build-tools/35.0.0/zipalign" "$RUNNER_TEMP/subgen-offline-signing/zipalign"
           chmod +x "$RUNNER_TEMP/subgen-offline-signing/zipalign"
+          cp test-results/DEBUG-APK-SIGNATURE.txt test-results/DEBUG-APK-IDENTITY.txt "$RUNNER_TEMP/subgen-offline-signing/"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/release/app-release-unsigned.apk > "$RUNNER_TEMP/subgen-offline-signing/UNSIGNED-STABLE-APK-IDENTITY.txt"
+          sha256sum app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/release/app-release-unsigned.apk > "$RUNNER_TEMP/subgen-offline-signing/BUILD-SHA256.txt"
           test -s "$RUNNER_TEMP/subgen-offline-signing/SubGen-v3.2.0-unsigned.apk"
       - name: Upload unsigned APK and offline signing tools
         uses: actions/upload-artifact@v4

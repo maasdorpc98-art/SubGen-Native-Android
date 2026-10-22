@@ -177,6 +177,12 @@ object ScriptParser {
                 val end=script.indexOf(']',i+1)
                 commandStart=i;commandEnd=end+1
                 if(end>i && end-i<=162 && handle(script.substring(i,end+1))){i=end+1;continue}
+                if((end<0||end-i>162||script.substring(i,end.coerceAtLeast(i)).contains('\n'))&&
+                    Regex("^\\[\\s*(?:pause|pauze|tempo|volume|profile|phase|gain|speed|delivery|emotion|pitch|voice|repeat|section|stage|breathe|paragraph|slow|soft|whisper|normal)\\b",RegexOption.IGNORE_CASE)
+                        .containsMatchIn(script.substring(i))){
+                    val lineEnd=script.indexOf('\n',i).let{if(it<0)script.length else it}
+                    commandStart=i;commandEnd=lineEnd;flush();emit(ScriptNode.Unknown(script.substring(i,lineEnd)));i=lineEnd;continue
+                }
             }
             if(c=='@'&&(i==0||!script[i-1].isLetterOrDigit())){
                 val plannerToken=planner.find(script.substring(i))?.takeIf{it.range.first==0}

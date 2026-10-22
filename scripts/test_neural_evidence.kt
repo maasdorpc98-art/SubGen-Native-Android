@@ -35,7 +35,7 @@ fun main(args:Array<String>){
             check(kotlin.math.abs(seconds-qa.seconds)<1.0/24000)
             val measured=HyperJson.audio(qa).put("speechBlocks",clips.count{it!=null}).put("scriptSha256",HyperAnalysis.hash(source))
                 .put("programmedSilenceFrames24k",prepared.filterIsInstance<ScriptNode.Pause>().sumOf{kotlin.math.round(it.seconds*24000).toLong()})
-                .put("preRenderEstimatedSeconds",ScriptTimeline.analyze(source).totalSeconds)
+                .put("preRenderEstimatedSeconds",prepared.sumOf{n->when(n){is ScriptNode.Pause->n.seconds;is ScriptNode.Speech->n.text.split(Regex("\\s+")).size*60.0/(145.0*VoiceDirection.resolve(n,1f).speed);else->0.0}})
                 .put("listeningAcceptance","NOT PERFORMED").put("androidDeviceTested",false)
             File(dir,"$name-measurements.json").writeText(measured.toString(2))
             HyperAudioQa.audition(output,File(dir,"$name-junction.wav"))
