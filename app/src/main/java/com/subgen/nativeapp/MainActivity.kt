@@ -67,6 +67,7 @@ class MainActivity : Activity() {
     private var applyingPreset=false
     private var selectedPreset="custom"
     private var refreshHyp: (() -> Unit)?=null
+    private var hypScriptField:EditText?=null
     private val originalPresets by lazy { org.json.JSONArray(assets.open("original-presets.json").bufferedReader().use{it.readText()}) }
     private val originalSelects by lazy { JSONObject(assets.open("original-selects.json").bufferedReader().use{it.readText()}) }
     private val mono=Typeface.create("monospace",Typeface.NORMAL)
@@ -781,6 +782,7 @@ class MainActivity : Activity() {
         pauseSetting("hyp:breatheSec","[breathe] PAUSE",5f)
         pauseSetting("hyp:paragraphSec","[paragraph] PAUSE",3f)
         val field=textEntry(editor,"Write or paste your hypnosis script","script",p.getString("script","")?:"")
+        hypScriptField=field
         action(editor,"IMPORT SCRIPT .TXT"){val i=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="text/plain"};@Suppress("DEPRECATION")startActivityForResult(i,910)}
         val check=hypSection("03 — SCRIPT CHECK + TIMELINE")
         val stats=txt(check,"Analysing script…",11f,Color.rgb(207,194,255),monoFont=true)
@@ -952,9 +954,12 @@ class MainActivity : Activity() {
         action(output,"RENDER HYPNOSIS WAV","primary"){startAction(RenderService.ACTION_RENDER)}
         action(output,"STOP RENDER · KEEP SAVED BLOCKS"){startAction(RenderService.ACTION_CANCEL)}
         action(output,"⬇ OPEN SAVED WAV","green"){openOutput()}
+        action(output,"HYPER AUDIT & PRODUCTION TOOLS · OPTIONAL"){
+            @Suppress("DEPRECATION")startActivityForResult(Intent(this,HyperActivity::class.java),940)
+        }
         status=txt(output,"Native Kokoro · Ready",10f,cool,monoFont=true)
         txt(output,"A foreground notification tracks processing. Completed spoken blocks remain saved for later sessions.",10f,cool)
-        txt(body,"HYPNOSIS STUDIO v3.1 · Native Android · HYPER Voice Direction",9f,cool,monoFont=true,gravity=Gravity.CENTER)
+        txt(body,"HYPNOSIS STUDIO v3.2 · Native Android · Optional HYPER production tools",9f,cool,monoFont=true,gravity=Gravity.CENTER)
     }
     private fun hypSection(s:String):LinearLayout{
         val pane=panel(body,fill=Color.rgb(23,29,43),border=Color.rgb(79,63,124),radius=12,padding=16,margin=16)
@@ -971,7 +976,14 @@ class MainActivity : Activity() {
     }.onFailure{Toast.makeText(this,"Cannot start: ${it.message}",Toast.LENGTH_LONG).show()}}
     @Deprecated("Android document result API")
     override fun onActivityResult(requestCode:Int,resultCode:Int,data:Intent?){super.onActivityResult(requestCode,resultCode,data)
-        if(resultCode!=RESULT_OK)return;val uri=data?.data?:return
+        if(resultCode!=RESULT_OK)return
+        if(requestCode==940){
+            val field=hypScriptField?:return
+            val start=data?.getIntExtra("sourceStart",0)?.coerceIn(0,field.length())?:0
+            val end=data?.getIntExtra("sourceEnd",start)?.coerceIn(start,field.length())?:start
+            field.requestFocus();field.setSelection(start,end);field.post{field.bringPointIntoView(start)};return
+        }
+        val uri=data?.data?:return
         runCatching{
             when(requestCode){
                 930->{

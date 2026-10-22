@@ -7,12 +7,12 @@ android {
         applicationId = "com.subgen.nativeapp.stable"
         minSdk = 29
         targetSdk = 34
-        versionCode = 13
-        versionName = "3.1.3-neuromodulation-full-ab"
+        versionCode = 14
+        versionName = "3.2.0-hyper-production"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     buildTypes {
-        debug { applicationIdSuffix = ".abtest"; versionNameSuffix = "-test" }
+        debug { applicationIdSuffix = ".hypertest"; versionNameSuffix = "-test" }
         release { isMinifyEnabled = false }
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }

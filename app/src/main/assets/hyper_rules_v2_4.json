@@ -1,0 +1,217 @@
+{
+  "standard": "HYPER",
+  "version": "2.4",
+  "universalCues": [
+    {
+      "id": "ENTRY",
+      "phrase": "Relax Deeply",
+      "function": "Voluntary entry or renewal"
+    },
+    {
+      "id": "DEEPEN",
+      "phrase": "Relax Your System Deeply",
+      "function": "Further deepening"
+    },
+    {
+      "id": "WAKE",
+      "phrase": "Here and Now",
+      "function": "Complete waking and reorientation"
+    },
+    {
+      "id": "SLEEP",
+      "phrase": "Sleep When Ready",
+      "function": "Natural-sleep transition"
+    }
+  ],
+  "frequencyTiers": [
+    {
+      "throughSeconds": 360,
+      "entry": 2,
+      "deepen": 2
+    },
+    {
+      "throughSeconds": 720,
+      "entry": 4,
+      "deepen": 4
+    },
+    {
+      "throughSeconds": 1080,
+      "entry": 5,
+      "deepen": 5
+    },
+    {
+      "throughSeconds": 1800,
+      "entry": 7,
+      "deepen": 7
+    },
+    {
+      "throughSeconds": 1000000000000.0,
+      "entry": 8,
+      "deepen": 8
+    }
+  ],
+  "naturalSleepMinimum": {
+    "entry": 3,
+    "deepen": 3
+  },
+  "thresholds": {
+    "clusterSeconds": 45,
+    "gapSeconds": 240,
+    "longPauseSeconds": 25,
+    "objectiveGapSeconds": 300,
+    "foundationCycles": 2,
+    "minimumDistinctDeepeners": 2
+  },
+  "sectionPatterns": {
+    "FIRST_RESPONSE": "FIRST[ _-]+(?:HYPNOTIC[ _-]+)?RESPONSE|INITIAL EXPERIENCE",
+    "RENEWED_DEEPENING": "RENEWED[ _-]+DEEP|CONTINUOUS[ _-]+DEEP|SENSORY INTENSIFICATION|LOOP STABILI[ZS]ATION",
+    "INDUCTION": "INDUCTION|CONDITIONED ENTRY|ATTENTIONAL ACQUISITION",
+    "DEEPENER": "DEEPENER|DEEPENING|PROGRESSIVE DEEP",
+    "FRACTIONATION": "FRACTIONATION",
+    "OBJECTIVE": "OBJECTIVE|SUGGESTION|ACTIVATION|TRAINING|MASTERY|CONTROL|PRECISION",
+    "REINFORCEMENT": "REINFORCEMENT",
+    "INTEGRATION": "INTEGRATION",
+    "ENDING": "WAKE|AWAKENING|SLEEP|LOOP JUNCTION"
+  },
+  "modeRequirements": {
+    "FOUNDATION": [
+      "INDUCTION",
+      "FIRST_RESPONSE",
+      "DEEPENER",
+      "OBJECTIVE",
+      "INTEGRATION"
+    ],
+    "DEEP": [
+      "INDUCTION",
+      "FIRST_RESPONSE",
+      "DEEPENER",
+      "OBJECTIVE",
+      "INTEGRATION"
+    ],
+    "BOOSTER": [
+      "INDUCTION",
+      "RENEWED_DEEPENING"
+    ],
+    "LOOP": [
+      "RENEWED_DEEPENING"
+    ],
+    "SLEEP": [
+      "INDUCTION"
+    ]
+  },
+  "endingCues": {
+    "WAKE": "WAKE",
+    "SLEEP": "SLEEP"
+  },
+  "policies": {
+    "CUE_FREQUENCY": {
+      "severity": "WARNING",
+      "allowException": true
+    },
+    "TIER_UNCERTAINTY": {
+      "severity": "WARNING",
+      "allowException": true
+    },
+    "SESSION_FREQUENCY": {
+      "severity": "WARNING",
+      "allowException": true
+    },
+    "CUE_CLUSTER": {
+      "severity": "WARNING",
+      "allowException": true
+    },
+    "CUE_PHASE": {
+      "severity": "WARNING",
+      "allowException": true
+    },
+    "CUE_GAP": {
+      "severity": "WARNING",
+      "allowException": true
+    },
+    "FIRST_RESPONSE": {
+      "severity": "WARNING",
+      "allowException": true
+    },
+    "FIRST_RESPONSE_ORDER": {
+      "severity": "WARNING",
+      "allowException": true
+    },
+    "STRUCTURE": {
+      "severity": "WARNING",
+      "allowException": true
+    },
+    "RENEWED_DEPTH": {
+      "severity": "WARNING",
+      "allowException": true
+    },
+    "FRACTIONATION": {
+      "severity": "WARNING",
+      "allowException": true
+    },
+    "FRACTIONATION_REVIEW": {
+      "severity": "WARNING",
+      "allowException": true
+    },
+    "SLEEP_FRACTIONATION": {
+      "severity": "WARNING",
+      "allowException": true
+    },
+    "FRACTIONATION_SPACING": {
+      "severity": "WARNING",
+      "allowException": true
+    },
+    "ENDING_CUE": {
+      "severity": "WARNING",
+      "allowException": true
+    },
+    "ENDING_CONFLICT": {
+      "severity": "WARNING",
+      "allowException": true
+    },
+    "INTERMEDIATE_WAKE": {
+      "severity": "WARNING",
+      "allowException": true
+    },
+    "LOOP_LANGUAGE": {
+      "severity": "WARNING",
+      "allowException": true
+    },
+    "LOOP_TERMINAL": {
+      "severity": "WARNING",
+      "allowException": true
+    },
+    "EYES_CONFLICT": {
+      "severity": "WARNING",
+      "allowException": true
+    },
+    "LONG_PAUSE": {
+      "severity": "WARNING",
+      "allowException": true
+    },
+    "PAUSE_CLUSTER": {
+      "severity": "WARNING",
+      "allowException": true
+    },
+    "MODE_UNCERTAIN": {
+      "severity": "WARNING",
+      "allowException": true
+    },
+    "DISTINCT_DEEPENERS": {
+      "severity": "WARNING",
+      "allowException": true
+    }
+  },
+  "sessionCueReferences": [],
+  "note": "Configurable editorial programme rules; not measured psychological outcomes.",
+  "sectionPatternOrder": [
+    "FIRST_RESPONSE",
+    "RENEWED_DEEPENING",
+    "INDUCTION",
+    "DEEPENER",
+    "FRACTIONATION",
+    "OBJECTIVE",
+    "REINFORCEMENT",
+    "INTEGRATION",
+    "ENDING"
+  ]
+}

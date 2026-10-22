@@ -11,6 +11,7 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <activity android:name="com.subgen.nativeapp.HyperActivity" android:exported="false"/>
         <service android:name="com.subgen.nativeapp.RenderService" android:exported="false" android:stopWithTask="false" android:foregroundServiceType="dataSync"/>
         <service android:name="com.subgen.nativeapp.NeuroModulationService" android:exported="false" android:stopWithTask="false" android:foregroundServiceType="dataSync"/>
     </application>
