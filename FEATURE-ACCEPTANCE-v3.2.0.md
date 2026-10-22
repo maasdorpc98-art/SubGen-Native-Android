@@ -42,7 +42,7 @@ Statuses separate executable core tests from physical Android acceptance. “IMP
 - Voice/speed/punctuation-calibrated runtime prediction: **DEFERRED**. The desktop test corpus is evidence, not a calibrated production model.
 - Genuine neural emotion/whisper/pitch acting and backend replacement: **NOT IMPLEMENTED; outside this authorized backend-preserving scope**.
 - Inline nonspoken comments: **NOT SUPPORTED by the established grammar**. Analysis warns if comment-like text is pasted. Introducing silently stripped narration would break compatibility; use separate production notes.
-- Original stable release signing and stable in-place upgrade test: **BLOCKED — original private signer unavailable**. No new stable key was substituted. Separate installable test APK plus unsigned stable-ID candidate are provided.
+- Original stable release signing: **IMPLEMENTED AND TESTED** by offline signature verification and direct certificate comparison against v3.1.3. Same stable package and versionCode 14. Physical in-place installation remains **TESTING INCOMPLETE — Samsung unavailable**. No replacement key was substituted.
 - Actual HYPER Sessions 001/004/006 recordings and scripts: **BLOCKED — not supplied**. Clearly labelled synthetic fixtures test their architecture requirements.
 - Samsung install/UI/listening/long-run/background/export acceptance: **BLOCKED — physical device unavailable**. Android compilation and desktop neural evidence do not replace this.
 

@@ -1,32 +1,37 @@
 # Installation, update and rollback — v3.2.0
 
-## Available test build
+## Stable in-place update
 
-The debug-signed APK uses `com.subgen.nativeapp.stable.hypertest`, versionCode 14. It installs alongside the stable app. It is not an in-place update and uses its own scripts, settings and model directory.
+The release APK retains `com.subgen.nativeapp.stable`, increases versionCode 13 to 14, and uses the same existing stable certificate as v3.1.3.
 
-1. Keep the stable app installed.
-2. Install the v3.2 test APK and open it.
-3. In Hypnosis, install the original FP32 model if needed, paste a script, create and export as before.
-4. Open the optional HYPER tools to inspect cues, structure and acoustics.
-5. After a render, measure the WAV. For loop work, audition both repeated junctions and optionally create a three-cycle QA copy.
-6. Review notes and approvals are optional production records, separate from ordinary export.
+1. Keep your existing SubGen app installed. Do not uninstall it.
+2. Open the signed v3.2 APK and accept Android's update prompt.
+3. Open Hypnosis, paste your script and use the existing Create/Export workflow.
+4. Optional: open **HYPER AUDIT & PRODUCTION TOOLS** in the Hypnosis output panel.
+5. After rendering, measure the WAV. For loop work, audition both repeated junctions. Three-cycle export and professional approvals remain optional.
 
-The model and arm64 runtime requirements are unchanged. This test APK does not share the existing stable app's private model/cache or settings. Use a short script before a long device test.
+The existing app-private model, settings, scripts, audio and speech cache are not intentionally cleared or migrated. Same package/signature/update identity is verified; physical Samsung installation and data retention still require device acceptance.
 
-## Stable update candidate
+If Android reports a package/signature conflict, stop rather than uninstalling. Compare the installed version/certificate with the identity manifest first.
 
-The release candidate retains `com.subgen.nativeapp.stable`, versionCode 14. It is UNSIGNED and not directly installable. The original private stable release signer is not included in the source or this deliverable.
+## Developer debug build
 
-A maintainer with the original keystore must align/sign the release candidate using that same key, verify its certificate digest against the installed v3.1.3 APK, inspect package/version and then install over it. Do not create a replacement key or use the test certificate for the stable package.
+CI also creates `com.subgen.nativeapp.stable.hypertest`, labelled **SubGen v3.2 Test**. It installs alongside stable with separate model/data storage. It is not the primary stable update deliverable.
 
-The CI signing kit includes the unsigned candidate, apksigner and zipalign. Keep private signing material out of the public repository and reports.
+## Signing provenance
+
+The original private backup was recovered and used locally. Its certificate SHA-256 matches v3.1.3:
+
+`37c823a64caae27f705c6e1b2736ba2b6081f3b144e96a9337defd85f1131f9e`
+
+The private key and passphrase are excluded from source, CI, reports and delivery packages. No replacement stable key was generated.
 
 ## Rollback
 
-For the separate test build, uninstall only the `.hypertest` app. The existing stable app is unaffected. Export wanted test WAVs/reports before removing it.
+Android ordinarily rejects downgrade from versionCode 14 to 13. Do not uninstall stable merely to downgrade: that erases private data. Preserve wanted WAV/report exports and use a forward versionCode rollback build signed with the original key, or a separately reviewed device backup/recovery procedure.
 
-For a later correctly signed stable upgrade, Android normally rejects an ordinary downgrade from versionCode 14 to 13. Do not uninstall the stable app merely to downgrade: that erases its private data. Preserve exports and use a forward versionCode rollback build signed by the original key, or follow an explicitly reviewed device backup/recovery procedure.
+For a `.hypertest` install, uninstall only that separate test app after exporting wanted test data; stable is unaffected.
 
 ## Device acceptance still required
 
-Verify Studio mixing/presets, Hypnosis playback/export, NeuroModulation A/B/A+B, optional panel controls, long rendering, foreground/background transitions, settings retention and loop listening on the intended Samsung. No physical-device install, upgrade or listening pass is claimed here.
+Verify Studio presets/mixing, Hypnosis playback/export, NeuroModulation A/B/A+B, optional panel interactions, long rendering, background/foreground transitions, settings retention and loop listening on the intended Samsung. No physical-device install, upgrade or listening pass is claimed here.

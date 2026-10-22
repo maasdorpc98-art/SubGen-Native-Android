@@ -4,7 +4,7 @@ Native optional production tools now sit within Hypnosis. Normal use remains **P
 
 See `CHANGELOG-HYPER-v3.2.0.md`, `FEATURE-ACCEPTANCE-v3.2.0.md`, `TEST-RESULTS-v3.2.0.md` and `INSTALL-AND-ROLLBACK-v3.2.0.md` for implementation, evidence and limits. The acoustic syntax remains the documented v3.1.1 contract; the new tools do not add hypnotic commands or rewrite narration.
 
-The installable test build uses a separate `.hypertest` ID. A stable-ID release candidate requires the original private stable signer, which is not present here. Samsung UI/listening acceptance and real-session verification remain outstanding.
+The release retains the stable package ID and original stable signer, compared against v3.1.3. VersionCode 14 permits an in-place upgrade without intentional data clearing. Developer debug builds use a separate `.hypertest` ID. Samsung installation/UI/listening acceptance and real-session verification remain outstanding.
 
 ---
 

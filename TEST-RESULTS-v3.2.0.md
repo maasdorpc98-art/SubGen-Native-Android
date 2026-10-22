@@ -44,7 +44,7 @@ The short directed fixture measured 15.45 s against an 11.37 s heuristic estimat
 
 The first build caught a syntax error in the new cue-editor UI. It was corrected before packaging. The subsequent build compiled the native debug APK and passed signature/arm64-runtime verification. Final release-candidate build status and exact artifact identities are recorded in the final build manifest accompanying delivery.
 
-No unsigned APK is described as signed. No stable in-place update is claimed without the original private signing key.
+The original stable signing backup was subsequently recovered and its certificate matched against the signed v3.1.3 APK. The final release is signed offline with that same key. APK signature, package and version checks are recorded in the final identity manifest. Actual Samsung installation is not claimed.
 
 ## Not performed
 

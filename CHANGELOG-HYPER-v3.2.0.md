@@ -36,4 +36,4 @@ The live timeline now reports invalid effective acoustic settings instead of thr
 - No neural emotion, true whisper, pitch acting, automatic rewriting or voice-backend replacement.
 - Zero-crossing/RMS boundary figures are coarse indicators, not perceptual or semantic seam approval.
 - Actual Sessions 001/004/006 and Samsung listening/device acceptance need their real assets/device. Synthetic fixtures do not substitute for those tests.
-- The original stable private signer is unavailable in this workspace. The installable test build uses a separate `.hypertest` application ID. The stable-ID release candidate remains unsigned until the established key is provided; no replacement stable key was created.
+- The original stable signing backup was recovered and its certificate matched against v3.1.3 (SHA-256 `37c823a64caae27f705c6e1b2736ba2b6081f3b144e96a9337defd85f1131f9e`). The release is signed offline with that existing key. No replacement key was generated. Physical Samsung installation/upgrade remains untested. Developer debug builds retain a separate `.hypertest` ID.
