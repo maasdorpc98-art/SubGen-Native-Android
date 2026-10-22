@@ -3,8 +3,8 @@ package com.subgen.nativeapp
 /** Reviews are evidence-bound snapshots, not mutable "approved" booleans. */
 object HyperGovernance {
     data class Identity(val scriptHash:String,val rulesHash:String,val rulesVersion:String,val mode:String,
-        val cues:String,val acousticSettings:String,val renderConfig:String,val audioHash:String="",val renderId:String="") {
-        val textKey get()=HyperAnalysis.hash(listOf(scriptHash,rulesHash,rulesVersion,mode,cues,acousticSettings).joinToString("\u0000"))
+        val cues:String,val acousticSettings:String,val renderConfig:String,val audioHash:String="",val renderId:String="",val subgenVersion:String=HyperAnalysis.VERSION) {
+        val textKey get()=HyperAnalysis.hash(listOf(scriptHash,rulesHash,rulesVersion,mode,cues,acousticSettings,subgenVersion).joinToString("\u0000"))
         val audioKey get()=HyperAnalysis.hash(listOf(textKey,renderConfig,audioHash,renderId).joinToString("\u0000"))
     }
     data class Review(val scope:String,val status:String,val binding:String,val note:String,val time:Long,

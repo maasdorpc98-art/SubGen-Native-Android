@@ -80,6 +80,7 @@ fun main(){
             check(analyze("$code Hello.").technicalErrors>0){code}
         check(analyze("[tempo 1.5]Hello.").technicalErrors>0)
         check(analyze("[the door opens] Hello.").technicalErrors==0)
+        check(analyze("<!-- note -->Hello.").findings.any{it.rule=="SPOKEN_COMMENT"})
     }
     verify("Conservative inference; absent waking never implies loop or sleep"){
         val a=analyze("A comfortable experience without ending labels.")
@@ -149,7 +150,7 @@ fun main(){
         val release=HyperGovernance.approve("RELEASE",id,listOf(text,audio),0,2,true,"Release accepted")
         val reviews=listOf(text,audio,release)
         check(HyperGovernance.state(id,reviews,0,2,true).release=="RELEASE APPROVED")
-        for(changed in listOf(id.copy(scriptHash="new"),id.copy(rulesHash="new"),id.copy(mode="SLEEP"),id.copy(cues="other"),id.copy(acousticSettings="other")))
+        for(changed in listOf(id.copy(scriptHash="new"),id.copy(rulesHash="new"),id.copy(mode="SLEEP"),id.copy(cues="other"),id.copy(acousticSettings="other"),id.copy(subgenVersion="3.3")))
             check(HyperGovernance.state(changed,reviews,0,2,true).editorial=="DRAFT")
         for(changed in listOf(id.copy(renderConfig="new"),id.copy(renderId="render2"),id.copy(audioHash="new")))
             check(HyperGovernance.state(changed,reviews,0,2,true).audio=="AUDIO PENDING")

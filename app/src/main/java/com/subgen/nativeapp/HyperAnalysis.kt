@@ -104,6 +104,9 @@ object HyperAnalysis {
             is ScriptNode.DeliveryChange->events+=Event(at,"LEGACY",n.mode,e.source)
         }}
         closeWindow()
+        Regex("<!--.*?-->|(?m)^\\s*//[^\\r\\n]*",RegexOption.DOT_MATCHES_ALL).findAll(source).forEach{comment->
+            finding("SPOKEN_COMMENT","The legacy acoustic grammar has no inline comment syntax. This remains spoken narration; keep nonspoken notes in separate production metadata.",ScriptSourceMap.position(source,comment.range.first,comment.range.last+1))
+        }
         if(passages.isEmpty())finding("NO_SPEECH","No spoken narration",error=true)
         // Also expose tempo/volume reset tokens, which intentionally do not add render nodes.
         doc.controls.filter{Regex("^\\[(?:tempo|volume)\\s+",RegexOption.IGNORE_CASE).containsMatchIn(it.token)}.forEach { control->
@@ -217,6 +220,7 @@ object HyperAnalysis {
             finding("EYES_CONFLICT","Eye-closing instruction in an eyes-open mode; inspect context.",it.source)}
         pauses.filter{it.seconds>rules.longPauseSeconds}.forEach{finding("LONG_PAUSE","${it.seconds}s programmed pause; review its purpose.",it.source)}
         pauses.zipWithNext().filter{(a,b)->b.at-a.at-a.seconds<2.0}.forEach{(_,b)->finding("PAUSE_CLUSTER","Nearby programmed pauses; inspect whether intentional.",b.source)}
+        if((mode.architecture=="LOOP"&&mode.ending !in setOf("LOOP","UNRESOLVED"))||(mode.architecture=="SLEEP"&&mode.ending !in setOf("SLEEP","UNRESOLVED")))finding("MODE_CONFLICT","Selected architecture and ending conflict; review optional classification.")
         if(mode.architecture=="UNRESOLVED"||mode.ending=="UNRESOLVED")finding("MODE_UNCERTAIN","Recording classification unresolved. Ordinary audio creation remains available.")
         return Result(hash(source),rules,mode,cues,passages.toList(),pauses.toList(),events.sortedBy{it.at},sorted,issues.toList(),words,speech,silence,at,lower,upper,firstResponse)
     }

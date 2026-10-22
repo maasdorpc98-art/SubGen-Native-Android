@@ -117,7 +117,8 @@ class HyperActivity:Activity() {
     private fun cueEditor(existing:HyperAnalysis.Cue?=null){
         val layout=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(12),0,dp(12),0)}
         val cfg=store.config();val session=field(layout,"Session ID",existing?.sessionId?:cfg.optString("sessionId"))
-        val name=field(layout,"Session name",store.registry().let{r->(0 until r.length()).map{r.getJSONObject(it)}.firstOrNull{it.optString("sessionId")==existing?.sessionId}?.optString("sessionName")?:"")
+        val priorName=store.registry().let{r->(0 until r.length()).map{r.getJSONObject(it)}.firstOrNull{it.optString("sessionId")==existing?.sessionId}?.optString("sessionName")?:""}
+        val name=field(layout,"Session name",priorName)
         val phrase=field(layout,"Approved exact spoken cue",existing?.phrase?:"")
         val function=field(layout,"Intended function",existing?.function?:"")
         val experience=field(layout,"Associated experience",existing?.experience?:"")
@@ -136,10 +137,10 @@ class HyperActivity:Activity() {
     private fun cueContext(a:HyperAnalysis.Result,h:HyperAnalysis.Occurrence){
         val layout=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(16),0,dp(16),dp(16))}
         label(layout,"${h.cue.kind} · L${h.source.line}:C${h.source.column} · ~${ScriptTimeline.time(h.at)}\n${h.section} / ${h.phase}",12f,muted)
-        val text=SpannableStringBuilder(h.before+"\n\n"+h.spoken+"\n\n"+h.after)
-        val start=h.before.length+2;text.setSpan(BackgroundColorSpan(Color.rgb(91,68,133)),start,start+h.spoken.length,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        text.setSpan(ForegroundColorSpan(Color.WHITE),start,start+h.spoken.length,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        label(layout,"",14f).text=text
+        val highlighted=SpannableStringBuilder(h.before+"\n\n"+h.spoken+"\n\n"+h.after)
+        val start=h.before.length+2;highlighted.setSpan(BackgroundColorSpan(Color.rgb(91,68,133)),start,start+h.spoken.length,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        highlighted.setSpan(ForegroundColorSpan(Color.WHITE),start,start+h.spoken.length,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        label(layout,"",14f).text=highlighted
         button(layout,"Go to exact source"){navigate(h.source)}
         val checks=listOf("Preparation present","Correct cue meaning","Meaningful continuation","No contradictory instruction","Reinforcement appropriate","Reviewed / approved")
         val boxes=checks.map{s->CheckBox(this).apply{text=s;setTextColor(white);layout.addView(this)}}

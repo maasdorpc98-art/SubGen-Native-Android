@@ -199,6 +199,14 @@
     "DISTINCT_DEEPENERS": {
       "severity": "WARNING",
       "allowException": true
+    },
+    "MODE_CONFLICT": {
+      "severity": "WARNING",
+      "allowException": true
+    },
+    "SPOKEN_COMMENT": {
+      "severity": "WARNING",
+      "allowException": true
     }
   },
   "sessionCueReferences": [],
