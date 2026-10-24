@@ -1,0 +1,17 @@
+{
+  "filename": "SubGen-Native-v3.2.3-Samsung-Audio-Picker-Stable-Update.apk",
+  "bytes": 17128162,
+  "sha256": "1df49abab4041aaeecd0df07f035b7921083589aa223cffd7deeea8fe931908d",
+  "package": "com.subgen.nativeapp.stable",
+  "version_code": 17,
+  "version_name": "3.2.3-samsung-audio-picker",
+  "signer_sha256": "37c823a64caae27f705c6e1b2736ba2b6081f3b144e96a9337defd85f1131f9e",
+  "previous_signer_matches": true,
+  "code_commit": "627061d5ddb0b5323d97d2fe456ee9a3f6d458ff",
+  "ci_run": "https://github.com/maasdorpc98-art/SubGen-Native-Android/actions/runs/40125342285",
+  "ci_result": "success",
+  "audio_engines_unchanged_from_v3_2_2": true,
+  "native_libraries_and_presets_unchanged": true,
+  "audio_picker": "Samsung My Files ACTION_GET_CONTENT audio/*, then generic GET_CONTENT, then OPEN_DOCUMENT",
+  "device_acceptance": "Samsung installed-picker appearance and starting tab require testing"
+}
