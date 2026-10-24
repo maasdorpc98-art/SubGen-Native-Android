@@ -179,7 +179,7 @@ class RenderService:Service() {
         StateStore.active(this,true)
         val result=File(filesDir,if(preview)"subliminal-preview.wav" else "subliminal-working.wav")
         if(hq){
-            val measured=HighQualityMixer.mix(settings,result,File(filesDir,"hq-studio-cache"),::update){cancelled.get()}
+            val measured=HighQualityMixer.mix(settings,result,File(cacheDir,"hq-studio-cache"),::update){cancelled.get()}
             Diagnostics.record("HQ_MIX_COMPLETE","PCM24; uniform peak protection",org.json.JSONObject().put("appliedGainDb",measured.appliedGainDb).put("sampleRate",measured.rate))
         }else NativeSubliminal.mix(settings,result,::update){cancelled.get()}
         Diagnostics.stage("SUBLIMINAL_WAV_COMPLETE")

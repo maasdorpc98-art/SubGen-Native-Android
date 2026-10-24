@@ -141,13 +141,28 @@ object HighQualityPcm {
             }
         };return inspect(target)
     }
-    fun normalized16(input:File,target:File,stop:()->Boolean={false}):Long {
+    fun normalized16(input:File,target:File,gainReport:(Double)->Unit={},stop:()->Boolean={false}):Long {
         val original=inspect(input);require(original.frames<=original.rate*720L){"NeuroMod source exceeds 12 minutes"}
-        Reader(input).use { r->val s=Resampler(r,24000);Writer(target,s.frames,24000,1,16,false).use { w->
-            for(i in 0 until s.frames){if(i%8192L==0L&&stop())throw InterruptedException("Normalization cancelled")
-                w.put(if(r.info.channels==2)(s.value(i,0)+s.value(i,1))*.5 else s.value(i,0))}
-            w.finish();return s.frames
-        } }
+        // Preserve an already normalized integer payload exactly, including negative full scale.
+        if(original.rate==24000&&original.channels==1&&original.format==1&&original.bits==16){
+            Reader(input).use { r->Writer(target,r.info.frames,24000,1,16,false).use { w->
+                for(i in 0 until r.info.frames){if(i%8192L==0L&&stop())throw InterruptedException("Normalization cancelled");w.put(r.at(i,0))}
+                w.finish();gainReport(0.0);return r.info.frames
+            }}
+        }
+        val prepared=File(target.parentFile,target.name+".normalizing-float.wav")
+        try{
+            resample(input,prepared,24000,1,stop=stop)
+            Reader(prepared).use { r->
+                var peak=0.0
+                for(i in 0 until r.info.frames){if(i%8192L==0L&&stop())throw InterruptedException("Normalization cancelled");peak=max(peak,abs(r.at(i,0)))}
+                val gain=if(peak>=1.0)(32767.0/32768.0)/peak else 1.0
+                Writer(target,r.info.frames,24000,1,16,false).use { w->
+                    for(i in 0 until r.info.frames){if(i%8192L==0L&&stop())throw InterruptedException("Normalization cancelled");w.put(r.at(i,0)*gain)}
+                    w.finish()
+                };gainReport(20*log10(gain));return r.info.frames
+            }
+        }finally{prepared.delete()}
     }
     /** A small deterministic TPDF dither is applied only at the final PCM24 conversion. */
     private class Dither {private var state=0x6532178

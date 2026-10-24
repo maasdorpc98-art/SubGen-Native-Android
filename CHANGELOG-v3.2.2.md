@@ -28,7 +28,7 @@ cloud processing or new audio effects are introduced.
 ## NeuroModulation
 
 - Original A and B protected encoders, PCM32 masters and independent source-recovery verification are unchanged.
-- HQ source preparation accepts higher-precision WAVs and converts once to the required 24 kHz mono PCM16 payload.
+- HQ source preparation accepts higher-precision WAVs and converts once to the required 24 kHz mono PCM16 payload. Float/resampling overshoots receive a uniform gain reduction before encoding, recorded in the manifest.
 - Generates independent 96 kHz mono PCM24 listening/mixer copies directly from the protected masters.
 - These copies are not digitally recoverable. They are not advertised as a higher-resolution source payload.
 - Reuses normalized inputs and verified masters when source/configuration match; master checksum must match the previous verification record.

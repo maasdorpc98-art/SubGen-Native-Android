@@ -43,9 +43,14 @@ class HighQualityNeuroService:Service(){
                 val source=if(HighQualityPcm.supported(input))input else NativeInputDecoder.prepare(input,::status){cancel.get()}
                 val cache=File(filesDir,"hq-neuro-cache").apply{mkdirs()}
                 val normalized=File(cache,HighQualityPcm.key("${HighQualityPcm.VERSION}|${HighQualityPcm.sha(source)}|normalized16")+".wav")
-                if(!runCatching{HighQualityPcm.inspect(normalized).rate==24000}.getOrDefault(false)){
+                val gainFile=File(cache,normalized.name+".gain")
+                val normalizedDigest=File(cache,normalized.name+".sha256")
+                var sourceGain=runCatching{gainFile.readText().toDouble().takeIf{it.isFinite()}?:0.0}.getOrDefault(0.0)
+                if(!runCatching{val saved=HighQualityPcm.inspect(normalized);saved.rate==24000&&saved.bits==16&&saved.channels==1&&normalizedDigest.readText()==HighQualityPcm.sha(normalized)}.getOrDefault(false)){
                     status("HQ · converting source once; protected payload remains 24 kHz PCM16")
-                    HighQualityPcm.normalized16(source,normalized){cancel.get()}
+                    HighQualityPcm.normalized16(source,normalized,gainReport={db->sourceGain=db}){cancel.get()}
+                    gainFile.writeText(sourceGain.toString())
+                    normalizedDigest.writeText(HighQualityPcm.sha(normalized))
                 }else status("HQ · reusing prepared source")
                 val frames=HighQualityPcm.inspect(normalized).frames;val sourceHash=HighQualityPcm.sha(normalized)
                 for(version in if(mode=="AB")listOf("A","B")else listOf(mode)){
@@ -81,7 +86,7 @@ class HighQualityNeuroService:Service(){
                     report.put("mode",version).put("masterRate",96000).put("pcmBits",32)
                         .put("normalizedWavSha256",sourceHash).put("sourceSamples",frames)
                         .put("durationSeconds",duration).put("modulationHz",hz).put("depth",depth)
-                        .put("quality","high").put("mixerPcmBits",24).put("mixerSha256",HighQualityPcm.sha(mixer))
+                        .put("quality","high").put("sourcePreparationGainDb",sourceGain).put("mixerPcmBits",24).put("mixerSha256",HighQualityPcm.sha(mixer))
                         .put("mixerEdition","96 kHz mono PCM24 · not digitally recoverable")
                         .put("warning","Recovery applies only to the unchanged protected PCM32 master and normalized PCM16 payload")
                     val temp=File(cache,record.name+".partial");temp.writeText(report.toString(2));HighQualityPcm.publish(temp,record)

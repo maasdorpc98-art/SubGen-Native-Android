@@ -94,6 +94,14 @@ fun main(){
             val out=File(dir,"pcm16norm.wav");HighQualityPcm.normalized16(input,out)
             check(input.readBytes().contentEquals(out.readBytes()))
         }
+        test("NeuroMod source conversion reduces float overshoots uniformly before PCM16 encoding"){
+            val input=tone("headroom-source.wav",amplitude=1.3)
+            val out=File(dir,"headroom-normalized.wav");var adjustment=0.0
+            HighQualityPcm.normalized16(input,out,gainReport={adjustment=it})
+            check(adjustment< -2.0)
+            HighQualityPcm.Reader(out).use{r->var sum=0.0;for(i in 0 until r.info.frames)sum+=r.at(i,0).pow(2)
+                check(abs(sqrt(sum/r.info.frames)-1/sqrt(2.0))<.002)}
+        }
         test("NeuroMod B stereo PCM32 remains independently recoverable after a separate PCM24 listening export"){
             val normalized=File(dir,"normalized.wav");val master=File(dir,"b-master32.wav")
             val config=NeuroModulationA.Config(3.0,40.0,.9)
