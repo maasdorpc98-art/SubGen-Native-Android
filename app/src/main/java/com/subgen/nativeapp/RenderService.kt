@@ -22,6 +22,7 @@ class RenderService:Service() {
     private val busy=AtomicBoolean(false)
     private val cancelled=AtomicBoolean(false)
     private var wakeLock:PowerManager.WakeLock?=null
+    private var renderSettings:android.content.SharedPreferences?=null
     override fun onBind(i:Intent?):IBinder?=null
     override fun onCreate(){super.onCreate();createChannel()}
     override fun onStartCommand(intent:Intent?,flags:Int,startId:Int):Int {
@@ -33,7 +34,12 @@ class RenderService:Service() {
             return START_NOT_STICKY
         }
         if(request==ACTION_CANCEL){if(busy.get()){cancelled.set(true);update("Stopping at safe checkpoint…")}else stopSelf();return START_NOT_STICKY}
+        if(StateStore.prefs(this).getBoolean("neuro:active",false)){
+            StateStore.status(this,"Finish or cancel NeuroMod before starting another render");stopSelfResult(startId);return START_NOT_STICKY
+        }
         if(busy.compareAndSet(false,true)){
+            renderSettings=PreferenceSnapshot(StateStore.prefs(this))
+            StateStore.active(this,true)
             cancelled.set(false)
             // Foreground promotion happens before doing any work, including downloading model assets.
             val note=notification("Preparing native render…")
@@ -53,7 +59,8 @@ class RenderService:Service() {
     private fun installOnly(){Diagnostics.stage("MODEL_INSTALL");ModelInstaller(this).install(::update)}
     private fun previewVoice(){
         Diagnostics.stage("VOICE_PREVIEW")
-        val p=StateStore.prefs(this)
+        val p=renderSettings?:PreferenceSnapshot(StateStore.prefs(this))
+        val hq=p.getBoolean("quality:hypnosis",false)
         val voice=p.getString("voice","SERENA")?:"SERENA"
         val sid=KokoroNative.voices[voice]?:3
         val neutral=p.getBoolean("dir:previewNeutral",false)
@@ -85,12 +92,19 @@ class RenderService:Service() {
                     val r=VoiceDirection.resolve(node,speed,config)
                     val (data,rate)=tts.synthesize(node.text,sid,r.speed){cancelled.get()}
                     val f=File(cacheDir,"subgen-preview-block-$index.wav")
-                    WavIO.writeMono(f,data,rate);clips[index]=f
+                    if(hq)HighQualityPcm.writeVoice(f,data,rate)else WavIO.writeMono(f,data,rate);clips[index]=f
                 }
             }
         }
         val name=if(neutral)"native-preview-neutral.wav" else "native-preview-directed.wav"
-        try{WavIO.assemble(prepared,clips,File(filesDir,name))}
+        try{
+            if(hq){
+                val raw=File(cacheDir,"hq-voice-preview-float.wav")
+                try{HighQualityNarration.assemble(prepared,clips,raw,stop={cancelled.get()})
+                    HighQualityPcm.export24(raw,File(filesDir,name),24000,2,stop={cancelled.get()})
+                }finally{raw.delete()}
+            }else WavIO.assemble(prepared,clips,File(filesDir,name))
+        }
         finally{clips.filterNotNull().forEach{it.delete()}}
         update("PREVIEW READY · $name")
     }
@@ -123,7 +137,9 @@ class RenderService:Service() {
     }
     private fun runSubliminal(){
         Diagnostics.stage("SUBLIMINAL_PREPARE")
-        val p=StateStore.prefs(this)
+        val p=renderSettings?:PreferenceSnapshot(StateStore.prefs(this))
+        val hq=p.getBoolean("quality:studio",false)
+        fun prepare(file:File)=if(hq&&HighQualityPcm.supported(file))file else NativeInputDecoder.prepare(file,::update){cancelled.get()}
         fun path(key:String)=p.getString(key,"")?.let{if(it.isBlank())null else File(it)}
         fun level(key:String,default:Float)=p.getFloat("slider:$key",default).toDouble()
         fun enabled(key:String)=p.getBoolean("check:$key",false)
@@ -135,10 +151,10 @@ class RenderService:Service() {
         val hpf=hpfArray[level("ctrl-carrier-hpf",0f).toInt().coerceIn(0,10)]
         val lpf=lpfArray[level("ctrl-carrier-lpf",0f).toInt().coerceIn(0,10)]
         val settings=NativeSubliminal.Settings(
-            carrierA=path("carrierStandard")?.let{NativeInputDecoder.prepare(it,::update){cancelled.get()}},
-            carrierB=path("carrierStandard")?.let{NativeInputDecoder.prepare(it,::update){cancelled.get()}},
-            affirmationA=path("affirmNormal")?.let{NativeInputDecoder.prepare(it,::update){cancelled.get()}},
-            affirmationB=path("affirmFrequency")?.let{NativeInputDecoder.prepare(it,::update){cancelled.get()}},
+            carrierA=path("carrierStandard")?.let{prepare(it)},
+            carrierB=path("carrierStandard")?.let{prepare(it)},
+            affirmationA=path("affirmNormal")?.let{prepare(it)},
+            affirmationB=path("affirmFrequency")?.let{prepare(it)},
             durationSeconds=duration,rate=rate,
             carrierDb=level("ctrl-vol-carrier",0f),carrier8dDb=level("ctrl-vol-carrier-8d",-60f),
             primaryDb=level("ctrl-vol1",0f),secondaryDb=level("ctrl-vol-noise",0f),
@@ -162,7 +178,10 @@ class RenderService:Service() {
         Diagnostics.stage("SUBLIMINAL_MIX",org.json.JSONObject().put("durationSeconds",duration).put("sampleRate",rate))
         StateStore.active(this,true)
         val result=File(filesDir,if(preview)"subliminal-preview.wav" else "subliminal-working.wav")
-        NativeSubliminal.mix(settings,result,::update){cancelled.get()}
+        if(hq){
+            val measured=HighQualityMixer.mix(settings,result,File(cacheDir,"hq-studio-cache"),::update){cancelled.get()}
+            Diagnostics.record("HQ_MIX_COMPLETE","PCM24; uniform peak protection",org.json.JSONObject().put("appliedGainDb",measured.appliedGainDb).put("sampleRate",measured.rate))
+        }else NativeSubliminal.mix(settings,result,::update){cancelled.get()}
         Diagnostics.stage("SUBLIMINAL_WAV_COMPLETE")
         if(cancelled.get()){update("Subliminal render cancelled");return}
         if(preview){
@@ -175,13 +194,16 @@ class RenderService:Service() {
         }else{
             update("Saving Subliminal WAV to Android Downloads…")
             val uri=WavIO.saveToDownloads(this,result,p.getString("subName","Subliminal Session")?:"Subliminal Session")
-            p.edit().putString("subLastFileUri",uri.toString()).apply()
+            StateStore.prefs(this).edit().putString("subLastFileUri",uri.toString()).apply()
             update("SAVED · Subliminal WAV · Downloads/SubGen")
         }
     }
     private fun runJob(){
         Diagnostics.stage("HYPNOSIS_PREPARE")
-        val prefs=StateStore.prefs(this)
+        val prefs=renderSettings?:PreferenceSnapshot(StateStore.prefs(this))
+        val livePrefs=StateStore.prefs(this)
+        val hq=prefs.getBoolean("quality:hypnosis",false)
+        fun validClip(file:File)=runCatching{if(hq)HighQualityNarration.frames(file)>0 else WavIO.loadMono(file).let{it.rate==24000&&it.frames>0}}.getOrDefault(false)
         val submittedScript=prefs.getString("script", "").orEmpty()
         val script=submittedScript.trim()
         require(script.isNotEmpty()){ "Enter a Hypnosis script first" }
@@ -219,11 +241,10 @@ class RenderService:Service() {
             if(n !is ScriptNode.Speech) return@forEachIndexed
             val resolved=VoiceDirection.resolve(rawNodes[index] as ScriptNode.Speech,speed,direction)
             val cacheSpeed=if(direction.enabled||n.tempo!=null||n.scriptProfile!=null) resolved.speed else speed
-            val key=StateStore.hash("native-kokoro-v1_0-fp32-validated|${sid}|${cacheSpeed}|${n.delivery}|${n.text}")
+            val key=if(hq)StateStore.hash("hq-float-voice-v1|${sid}|${resolved.speed}|${n.text}") else StateStore.hash("native-kokoro-v1_0-fp32-validated|${sid}|${cacheSpeed}|${n.delivery}|${n.text}")
             val clip=File(StateStore.blocksDir(this),"$key.wav")
-            val header=runCatching{WavIO.loadMono(clip)}.getOrNull()
             checkpointFiles[index]=clip
-            if(header!=null && header.rate==24000 && header.frames>0) {
+            if(validClip(clip)) {
                 cached[index]=true
                 preflightHits++
             } else if(clip.exists()) clip.delete()
@@ -257,7 +278,7 @@ class RenderService:Service() {
                 if(cancelled.get()){update("Stopped after $finished / $speechCount blocks. Saved blocks retained.");return}
                 if(n !is ScriptNode.Speech)return@forEachIndexed
                 val clip=checkpointFiles[index] ?: error("Missing checkpoint reference")
-                if(cached[index] || runCatching{val c=WavIO.loadMono(clip);c.rate==24000&&c.frames>0}.getOrDefault(false)){cacheHits++}
+                if(cached[index] || validClip(clip)){cacheHits++}
                 else {
                     val activeTts=tts?:error("Synthesis engine missing for uncached speech block")
                     if(finished==0 || finished%6==0)update("Generating ${finished+1} / $speechCount · $voice · saved $finished")
@@ -277,7 +298,7 @@ class RenderService:Service() {
                     quartileMs[bucket]+=elapsedBlockMs
                     quartileSamples[bucket]+=samples.size
                     if(cancelled.get()){update("Stopped after $finished completed blocks");return}
-                    WavIO.writeMono(clip,samples,sr)
+                    if(hq)HighQualityPcm.writeVoice(clip,samples,sr)else WavIO.writeMono(clip,samples,sr)
                     generated++
                 }
                 checkpointFiles[index]=clip
@@ -318,7 +339,7 @@ class RenderService:Service() {
         require(requestedRate in OutputFormat.rates){"Unsupported output sample rate"}
         // Binaural separation requires stereo. Keep the stored preference unchanged.
         val binaural=(prefs.getBoolean("binaural",false) && outChannels==2)
-        val sec=WavIO.assemble(nodes,checkpointFiles,path,binOn=binaural)
+        val sec=if(hq)HighQualityNarration.assemble(nodes,checkpointFiles,path,binaural){cancelled.get()} else WavIO.assemble(nodes,checkpointFiles,path,binOn=binaural)
         Diagnostics.record("WAV_ASSEMBLY_COMPLETED","",org.json.JSONObject()
             .put("elapsedMs",SystemClock.elapsedRealtime()-assembleStart)
             .put("durationSeconds",sec).put("bytes",path.length()))
@@ -329,7 +350,11 @@ class RenderService:Service() {
         val formatStart=SystemClock.elapsedRealtime()
         val outputDb=prefs.getFloat("hyp:outputDb",0f).toDouble().coerceIn(-30.0,12.0)
         val ceilingDb=prefs.getFloat("hyp:peakDb",-1f).toDouble().coerceIn(-12.0,0.0)
-        val formatted=OutputFormat.convert(path,finalPath,requestedRate,outChannels,volumeDb=outputDb,ceilingDb=ceilingDb)
+        val formatted=if(hq){
+            val q=HighQualityPcm.export24(path,finalPath,requestedRate,outChannels,volumeDb=outputDb,ceilingDb=ceilingDb){cancelled.get()}
+            OutputFormat.Result(q.seconds,q.bytes,q.peak,q.appliedGainDb,q.rate,q.channels)
+        }else OutputFormat.convert(path,finalPath,requestedRate,outChannels,volumeDb=outputDb,ceilingDb=ceilingDb)
+        val bytesPerSample=if(hq)3 else 2
         Diagnostics.record("WAV_OUTPUT_FORMAT_COMPLETED","",org.json.JSONObject()
             .put("elapsedMs",SystemClock.elapsedRealtime()-formatStart)
             .put("sampleRate",formatted.rate).put("channels",formatted.channels)
@@ -343,18 +368,18 @@ class RenderService:Service() {
             .put("elapsedMs",SystemClock.elapsedRealtime()-exportStart).put("bytes",finalPath.length()))
         val rtf=if(generatedSamples>0)inferenceMs/1000.0/(generatedSamples/24000.0) else 0.0
         update("SAVED · ${"%.1f".format(sec/60)} min · $generated new / $cacheHits reused · RTF ${"%.2f".format(rtf)} · Downloads/SubGen")
-        prefs.edit().putString("lastFileUri",uri.toString())
-            .putLong("hyp:lastFinalFrames",(formatted.bytes-44L)/(formatted.channels*2))
+        livePrefs.edit().putString("lastFileUri",uri.toString())
+            .putLong("hyp:lastFinalFrames",(formatted.bytes-44L)/(formatted.channels*bytesPerSample))
             .putInt("hyp:lastRate",formatted.rate)
             .putString("hyp:lastScriptHash",StateStore.hash(prefs.getString("script","")?:""))
             .apply()
         val voiceFrames=nodes.indices.sumOf { i ->
-            if(nodes[i] is ScriptNode.Speech) WavIO.loadMono(checkpointFiles[i]!!).frames else 0L
+            if(nodes[i] is ScriptNode.Speech) {if(hq)HighQualityNarration.frames(checkpointFiles[i]!!)else WavIO.loadMono(checkpointFiles[i]!!).frames} else 0L
         }
-        prefs.edit().putLong("hyp:lastVoiceFrames",voiceFrames).apply()
+        livePrefs.edit().putLong("hyp:lastVoiceFrames",voiceFrames).apply()
         runCatching{HyperStore.recordRender(this,submittedScript,hyperAcoustics,
-            HyperStore.output(formatted.rate,formatted.channels,outputDb,ceilingDb,binaural),rawNodes,
-            (formatted.bytes-44L)/(formatted.channels*2),formatted.rate)
+            HyperStore.output(formatted.rate,formatted.channels,outputDb,ceilingDb,binaural,if(hq)24 else 16),rawNodes,
+            (formatted.bytes-44L)/(formatted.channels*bytesPerSample),formatted.rate)
         }.onFailure{Diagnostics.failure("HYPER_RENDER_EVIDENCE_FAILED",it)}
     }
     private fun update(message:String){Diagnostics.progress(message);StateStore.status(this,message);(getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(ID,notification(message))}
@@ -371,6 +396,6 @@ class RenderService:Service() {
         NotificationChannel(CHANNEL,"Hypnosis rendering",NotificationManager.IMPORTANCE_LOW))}
     private fun acquireWake(){wakeLock=(getSystemService(POWER_SERVICE) as PowerManager).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,"SubGen:HypnosisRender").apply{setReferenceCounted(false);acquire(5*60*60*1000L)}}
     private fun releaseWake(){if(wakeLock?.isHeld==true)wakeLock?.release();wakeLock=null}
-    override fun onDestroy(){cancelled.set(true);releaseWake();executor.shutdown();super.onDestroy()}
+    override fun onDestroy(){cancelled.set(true);StateStore.active(this,false);releaseWake();executor.shutdown();super.onDestroy()}
     companion object{const val ACTION_RENDER="com.subgen.nativeapp.RENDER";const val ACTION_CANCEL="com.subgen.nativeapp.CANCEL";const val ACTION_INSTALL="com.subgen.nativeapp.INSTALL";const val ACTION_BENCHMARK="com.subgen.nativeapp.BENCHMARK";const val ACTION_PREVIEW="com.subgen.nativeapp.PREVIEW";const val ACTION_SUBLIMINAL="com.subgen.nativeapp.SUBLIMINAL";const val CHANNEL="subgen-hypnosis";const val ID=9021}
 }

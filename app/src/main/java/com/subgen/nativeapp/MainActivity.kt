@@ -305,8 +305,9 @@ class MainActivity : Activity() {
         }
         val output=subCard(mixer,"Final output","Master gain changes every active layer together",Color.rgb(36,97,84))
         slider(output,"ctrl-master-output-db",master=true)
+        qualityToggle(output,"quality:studio","Float processing, cached source conversion and 24-bit WAV. Peak protection preserves the mix balance.")
         txt(output,"Audio creation and quality · configuration",10f,cool)
-        for(n in listOf(2,4,8,10))action(output,"$n MINUTES"){p.edit().putString("ctrl-duration","$n").apply();showTab("studio")}
+        for(n in listOf(2,4,8,10))action(output,"$n MINUTES"){p.edit().putString("select:ctrl-duration","$n").apply();showTab("studio")}
         expandable(output,"More durations, quality & safety ⌄",false){c->
             select(c,"ctrl-duration","LOOP DURATION")
             select(c,"ctrl-memory-mode","MEMORY MODE")
@@ -364,7 +365,16 @@ class MainActivity : Activity() {
             chooseAudio(code)
         }
     }
+    private fun qualityToggle(parent:LinearLayout,key:String,description:String){
+        val control=CheckBox(this).apply{
+            text="HIGH QUALITY · 24-BIT WAV";setTextColor(green);textSize=12f
+            isChecked=p.getBoolean(key,false)
+            setOnCheckedChangeListener{_,enabled->p.edit().putBoolean(key,enabled).apply();showTab(activeTab)}
+        }
+        parent.addView(control,params(d(48)));txt(parent,description,10f,cool)
+    }
     private fun chooseAudio(code:Int){
+        if(StateStore.active(this)||p.getBoolean("neuro:active",false)){Toast.makeText(this,"Finish or cancel rendering before replacing source audio",Toast.LENGTH_LONG).show();return}
         val pick=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{
             addCategory(Intent.CATEGORY_OPENABLE)
             type="audio/*"
@@ -489,6 +499,7 @@ class MainActivity : Activity() {
         }
         txt(input,"Local WAV, MP3, M4A or FLAC when the device supports decoding. Original input is kept intact. Processing normalizes to 24 kHz mono PCM16.",10f,cool)
 
+        qualityToggle(input,"quality:neuro","Protected masters remain 96 kHz PCM32. Creates 24-bit listening copies and reuses unchanged verified work. Payload remains 24 kHz PCM16.")
         val modes=section(body,"02 — Select Original Experiment Method")
         for((mode,label,desc) in listOf(
             Triple("A","VERSION A · DIRECT AM","Mono 96 kHz PCM32 protected master · exact normalized speech recovery"),
@@ -543,8 +554,8 @@ class MainActivity : Activity() {
         val run=section(body,"04 — Generate & Verify")
         neuroStatusText=txt(run,p.getString("neuro:status","Ready for spoken audio")?:"Ready for spoken audio",11f,green,true)
         action(run,"▶ GENERATE ${if(chosen=="AB")"BOTH A + B" else "VERSION $chosen"}","primary"){
-            if(p.getBoolean("neuro:active",false)){
-                Toast.makeText(this,"A NeuroModulation render is already running",Toast.LENGTH_LONG).show();return@action
+            if(p.getBoolean("neuro:active",false)||StateStore.active(this)){
+                Toast.makeText(this,"Finish or cancel the active render first",Toast.LENGTH_LONG).show();return@action
             }
             if(p.getString("neuro:input",null)?.let(::File)?.isFile!=true){Toast.makeText(this,"Choose a recording in Section 01 first",Toast.LENGTH_LONG).show();return@action}
             val duration=seconds.text.toString().toDoubleOrNull()
@@ -554,14 +565,16 @@ class MainActivity : Activity() {
             val validation=runCatching{NeuroModulationA.Config(duration?:Double.NaN,frequency,amount).checked()}
             if(validation.isFailure){Toast.makeText(this,validation.exceptionOrNull()?.message,Toast.LENGTH_LONG).show();return@action}
             p.edit().putString("neuro:status","Preparing $chosen · generating and verifying…").apply()
-            val i=Intent(this,NeuroModulationService::class.java).apply{
+            val hq=p.getBoolean("quality:neuro",false)
+            p.edit().putBoolean("neuro:hqActive",hq).apply()
+            val i=Intent(this,if(hq)HighQualityNeuroService::class.java else NeuroModulationService::class.java).apply{
                 action=NeuroModulationService.ACTION_GENERATE
                 putExtra("mode",chosen);putExtra("duration",duration!!);putExtra("frequency",frequency);putExtra("depth",amount)
             }
             runCatching{startForegroundService(i)}.onFailure{Toast.makeText(this,it.message,Toast.LENGTH_LONG).show()}
         }
         action(run,"■ CANCEL GENERATION"){
-            if(p.getBoolean("neuro:active",false))startService(Intent(this,NeuroModulationService::class.java).apply{action=NeuroModulationService.ACTION_CANCEL})
+            if(p.getBoolean("neuro:active",false))startService(Intent(this,if(p.getBoolean("neuro:hqActive",false))HighQualityNeuroService::class.java else NeuroModulationService::class.java).apply{action=NeuroModulationService.ACTION_CANCEL})
             else Toast.makeText(this,"No generation is currently running",Toast.LENGTH_SHORT).show()
         }
         action(run,"↻ REFRESH OUTPUT STATUS"){showTab("neuro")}
@@ -586,8 +599,9 @@ class MainActivity : Activity() {
             action(out,"↓ SAVE VERSION $m · PROTECTED PCM32 MASTER"){
                 if(requireReady())neuroChooseExport(if(m=="A")931 else 935,"EXP_001_${m}_Protected_96k_PCM32.wav")
             }
-            action(out,"↓ SAVE VERSION $m · MIXER PCM16 EDITION"){
-                if(requireReady())neuroChooseExport(if(m=="A")932 else 936,"EXP_001_${m}_Listening_96k_PCM16.wav")
+            val mixerBits=runCatching{JSONObject(p.getString("neuro:manifest:$m","{}")?:"{}").optInt("mixerPcmBits",16)}.getOrDefault(16)
+            action(out,"↓ SAVE VERSION $m · MIXER PCM$mixerBits EDITION"){
+                if(requireReady())neuroChooseExport(if(m=="A")932 else 936,"EXP_001_${m}_Listening_96k_PCM$mixerBits.wav")
             }
             action(out,"↓ SAVE VERSION $m · VERIFICATION MANIFEST"){
                 if(requireReady())chooseExport(if(m=="A")934 else 937,"EXP_001_${m}_Verification.json")
@@ -602,12 +616,12 @@ class MainActivity : Activity() {
             }
             action(out,"↗ SEND VERSION $m → STUDIO SECONDARY","aqua"){
                 if(requireReady()){
-                    p.edit().putString("affirmFrequency",p.getString("neuro:mixer:$m",null)).apply();showTab("studio")
+                    p.edit().putString("affirmFrequency",p.getString("neuro:mixer:$m",null)).apply();if(mixerBits==24)p.edit().putBoolean("quality:studio",true).apply();showTab("studio")
                 }
             }
             action(out,"↗ SEND VERSION $m → STUDIO PRIMARY","aqua"){
                 if(requireReady()){
-                    p.edit().putString("affirmNormal",p.getString("neuro:mixer:$m",null)).apply();showTab("studio")
+                    p.edit().putString("affirmNormal",p.getString("neuro:mixer:$m",null)).apply();if(mixerBits==24)p.edit().putBoolean("quality:studio",true).apply();showTab("studio")
                 }
             }
         }
@@ -845,7 +859,8 @@ class MainActivity : Activity() {
         }
         action(voicePreview,"▶ PLAY NEUTRAL COMPARISON"){playPreview("native-preview-neutral.wav")}
         val output=hypSection("05 — OUTPUT / RENDER")
-        txt(output,"PCM 16-BIT WAV · EXACT PAUSES · LOCAL PROCESSING",10f,cool,monoFont=true)
+        qualityToggle(output,"quality:hypnosis","Retains float voice samples through processing, then exports PCM24. Native 24 kHz avoids unnecessary resampling.")
+        txt(output,if(p.getBoolean("quality:hypnosis",false))"PCM 24-BIT WAV · EXACT PAUSES · LOCAL PROCESSING" else "PCM 16-BIT WAV · EXACT PAUSES · LOCAL PROCESSING",10f,cool,monoFont=true)
         space(output,12)
         var updateSummary:(()->Unit)?=null
         txt(output,"OUTPUT SAMPLE RATE",10f,Color.rgb(190,177,255),monoFont=true,tracking=.12f)
@@ -942,7 +957,8 @@ class MainActivity : Activity() {
             }.ifEmpty{"Add a script to see the timeline."}
             val hz=p.getInt("hyp:sampleRate",24000)
             val channels=p.getInt("hyp:channels",2)
-            val mb=ScriptTimeline.estimatedWavBytes(summary.totalSeconds,hz,channels)/1e6
+            val originalBytes=ScriptTimeline.estimatedWavBytes(summary.totalSeconds,hz,channels)
+            val mb=(44L+(originalBytes-44L)*(if(p.getBoolean("quality:hypnosis",false))3 else 2)/2)/1e6
             estimated.text="ESTIMATED DURATION  ·  "+ScriptTimeline.time(summary.totalSeconds)+
                 " (range "+ScriptTimeline.time(summary.lowerSeconds)+"–"+ScriptTimeline.time(summary.upperSeconds)+")"+
                 (if(p.getString("hyp:lastScriptHash","")==StateStore.hash(field.text.toString()) && p.getLong("hyp:lastFinalFrames",0)>0)
