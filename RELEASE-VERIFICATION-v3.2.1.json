@@ -1,0 +1,15 @@
+{
+  "filename": "SubGen-Native-v3.2.1-Audio-Picker-Stable-Update.apk",
+  "bytes": 17074914,
+  "sha256": "b6914c3300de1f63cca2c38f058701d8da068850e99824fcac1597cc7679750e",
+  "package": "com.subgen.nativeapp.stable",
+  "version_code": 15,
+  "version_name": "3.2.1-audio-picker",
+  "signer_sha256": "37c823a64caae27f705c6e1b2736ba2b6081f3b144e96a9337defd85f1131f9e",
+  "previous_signer_matches": true,
+  "code_commit": "5fe6e222be27d18448969cf93d9985e3a2f23f93",
+  "documentation_commit": "6be854cfda62cf1c387e4830bca2511f186c37af",
+  "ci_run": "https://github.com/maasdorpc98-art/SubGen-Native-Android/actions/runs/40119818152",
+  "ci_result": "success",
+  "device_acceptance": "not tested"
+}
