@@ -3,7 +3,7 @@
 All audio-import buttons now request the system file picker's Audio category
 as their initial location instead of inheriting an arbitrary folder.
 
-- Studio: Standard Carrier, 8D Carrier, Primary Affirmation and Secondary Affirmation.
+- Studio: Carrier (shared by Standard and 8D), Primary Affirmation and Secondary Affirmation.
 - NeuroMod: Choose / Replace Affirmation Audio.
 - Audio-only filtering and the original import callbacks are retained.
 - Script and JSON import/export pickers retain their existing behavior.
