@@ -51,7 +51,8 @@ class HyperStore(private val context:Context) {
     fun identity(a:HyperAnalysis.Result):HyperGovernance.Identity {
         val p=StateStore.prefs(context);val acoustics=acoustics(p.getString("voice","SERENA")?:"SERENA",settings())
         val output=output(p.getInt("hyp:sampleRate",24000),p.getInt("hyp:channels",2),p.getFloat("hyp:outputDb",0f).toDouble(),
-            p.getFloat("hyp:peakDb",-1f).toDouble(),p.getBoolean("binaural",false)&&p.getInt("hyp:channels",2)==2)
+            p.getFloat("hyp:peakDb",-1f).toDouble(),p.getBoolean("binaural",false)&&p.getInt("hyp:channels",2)==2,
+            if(p.getBoolean("quality:hypnosis",false))24 else 16)
         val render=render();val qa=measurements()
         val bound=render!=null&&qa!=null&&render.optString("scriptSha256")==a.scriptHash&&render.optString("acoustics")==acoustics&&
             render.optString("outputConfig")==output&&qa.optString("renderId")==render.optString("renderId")&&
@@ -97,8 +98,8 @@ class HyperStore(private val context:Context) {
             .put("breatheSeconds",s.breathe).put("paragraphSeconds",s.paragraph).put("directionEnabled",s.direction.enabled).put("profile",s.direction.profile)
             .put("globalDirectionGainDb",s.direction.globalGainDb).put("phaseRules",JSONObject().apply{s.direction.sectionRules.forEach{(name,rule)->
                 put(name,JSONObject().put("tempo",rule.tempo).put("gainDb",rule.gainDb))}}))
-        fun output(rate:Int,channels:Int,gain:Double,ceiling:Double,binaural:Boolean)=HyperJson.canonical(JSONObject().put("rate",rate).put("channels",channels)
-            .put("outputDb",gain).put("ceilingDb",ceiling).put("binaural",binaural))
+        fun output(rate:Int,channels:Int,gain:Double,ceiling:Double,binaural:Boolean,pcmBits:Int=16)=HyperJson.canonical(JSONObject().put("rate",rate).put("channels",channels)
+            .put("outputDb",gain).put("ceilingDb",ceiling).put("binaural",binaural).apply{if(pcmBits!=16)put("pcmBits",pcmBits)})
         /** Called only after the existing export succeeds. Failure is diagnostic, never a rendering gate. */
         fun recordRender(context:Context,source:String,acoustics:String,outputConfig:String,nodes:List<ScriptNode>,frames:Long,rate:Int){
             val store=HyperStore(context);val id=UUID.randomUUID().toString()

@@ -250,5 +250,15 @@ object Diagnostics {
     }
 }
 class SubGenApplication : Application() {
-    override fun onCreate() { super.onCreate(); Diagnostics.install(this) }
+    override fun onCreate() {
+        super.onCreate();Diagnostics.install(this)
+        // A fresh process has no running render executor. Release stale UI locks after a kill.
+        val prefs=StateStore.prefs(this)
+        val interrupted=prefs.getBoolean("renderActive",false)||prefs.getBoolean("neuro:active",false)
+        prefs.edit().putBoolean("renderActive",false).putBoolean("neuro:active",false).apply()
+        if(interrupted){
+            StateStore.status(this,"Previous render stopped · saved blocks and completed outputs retained")
+            Diagnostics.record("RENDER_RECOVERY","Fresh process cleared stale render state; no automatic restart")
+        }
+    }
 }

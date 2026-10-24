@@ -43,11 +43,12 @@ jobs:
           python3 scripts/check-neuromodulation.py
           bash scripts/run-core-tests.sh
           bash scripts/run-hyper-tests.sh
+          bash scripts/run-hq-tests.sh
       - name: Upload HYPER test evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: SubGen-v3.2.1-test-evidence
+          name: SubGen-v3.2.2-test-evidence
           path: test-results/
       - name: Native sherpa-onnx runtime and Kotlin JNI bridge
         run: |
@@ -81,28 +82,28 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/subgen-offline-signing"
-          cp app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/subgen-offline-signing/SubGen-v3.2.1-unsigned.apk"
+          cp app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/subgen-offline-signing/SubGen-v3.2.2-unsigned.apk"
           cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" "$RUNNER_TEMP/subgen-offline-signing/apksigner.jar"
           cp "$ANDROID_HOME/build-tools/35.0.0/zipalign" "$RUNNER_TEMP/subgen-offline-signing/zipalign"
           chmod +x "$RUNNER_TEMP/subgen-offline-signing/zipalign"
           cp test-results/DEBUG-APK-SIGNATURE.txt test-results/DEBUG-APK-IDENTITY.txt "$RUNNER_TEMP/subgen-offline-signing/"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/release/app-release-unsigned.apk > "$RUNNER_TEMP/subgen-offline-signing/UNSIGNED-STABLE-APK-IDENTITY.txt"
           sha256sum app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/release/app-release-unsigned.apk > "$RUNNER_TEMP/subgen-offline-signing/BUILD-SHA256.txt"
-          test -s "$RUNNER_TEMP/subgen-offline-signing/SubGen-v3.2.1-unsigned.apk"
+          test -s "$RUNNER_TEMP/subgen-offline-signing/SubGen-v3.2.2-unsigned.apk"
       - name: Upload unsigned APK and offline signing tools
         uses: actions/upload-artifact@v4
         with:
-          name: SubGen-v3.2.1-Unsigned-Stable-Signing-Kit
+          name: SubGen-v3.2.2-Unsigned-Stable-Signing-Kit
           path: ${{ runner.temp }}/subgen-offline-signing/
           if-no-files-found: error
 
       - name: Create exact source snapshot from this commit
-        run: git archive --format=zip HEAD -o "$RUNNER_TEMP/SubGen-Native-v3.2.1-HYPER-Source.zip"
+        run: git archive --format=zip HEAD -o "$RUNNER_TEMP/SubGen-Native-v3.2.2-HYPER-Source.zip"
       - name: Upload matching source snapshot
         uses: actions/upload-artifact@v4
         with:
-          name: SubGen-Native-v3.2.1-HYPER-Source
-          path: ${{ runner.temp }}/SubGen-Native-v3.2.1-HYPER-Source.zip
+          name: SubGen-Native-v3.2.2-HYPER-Source
+          path: ${{ runner.temp }}/SubGen-Native-v3.2.2-HYPER-Source.zip
           if-no-files-found: error
       - name: Publish installable diagnostic APK pre-release
         if: github.event_name == 'push' && false
