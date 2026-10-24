@@ -3,6 +3,7 @@ package com.subgen.nativeapp
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
@@ -375,15 +376,28 @@ class MainActivity : Activity() {
     }
     private fun chooseAudio(code:Int){
         if(StateStore.active(this)||p.getBoolean("neuro:active",false)){Toast.makeText(this,"Finish or cancel rendering before replacing source audio",Toast.LENGTH_LONG).show();return}
-        val pick=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{
+        val pick=Intent(Intent.ACTION_GET_CONTENT).apply{
             addCategory(Intent.CATEGORY_OPENABLE)
             type="audio/*"
-            // Start in the system Audio category, regardless of the last folder visited.
-            // If unavailable, the system picker falls back to its default location.
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE,false)
+        }
+        fun launch(intent:Intent,label:String):Boolean=try{
+            // Try launching directly: resolveActivity can hide installed apps on Android 11+.
+            @Suppress("DEPRECATION") startActivityForResult(intent,code)
+            Diagnostics.record("AUDIO_PICKER_OPEN",label)
+            true
+        }catch(_:ActivityNotFoundException){false}catch(_:SecurityException){false}
+        // GET_CONTENT reaches My Files' audio-import UI and its Recent files list.
+        // OPEN_DOCUMENT alone only lists document providers, hiding external picker apps.
+        if(launch(Intent(pick).setPackage("com.sec.android.app.myfiles"),"Samsung My Files · audio import"))return
+        if(launch(pick,"Available audio import picker"))return
+        val documents=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{
+            addCategory(Intent.CATEGORY_OPENABLE);type="audio/*"
             putExtra(DocumentsContract.EXTRA_INITIAL_URI,
                 DocumentsContract.buildRootUri("com.android.providers.media.documents","audio_root"))
         }
-        @Suppress("DEPRECATION") startActivityForResult(pick,code)
+        if(!launch(documents,"System document picker · audio"))
+            Toast.makeText(this,"No audio file picker is available on this device",Toast.LENGTH_LONG).show()
     }
     private fun slider(parent:LinearLayout,id:String,master:Boolean=false){
         val spec=OriginalStudioControlSpec.slider(id)
@@ -1009,7 +1023,7 @@ class MainActivity : Activity() {
             val end=data?.getIntExtra("sourceEnd",start)?.coerceIn(start,field.length())?:start
             field.requestFocus();field.setSelection(start,end);field.post{field.bringPointIntoView(start)};return
         }
-        val uri=data?.data?:return
+        val uri=data?.data?:data?.clipData?.takeIf{it.itemCount==1}?.getItemAt(0)?.uri?:return
         runCatching{
             when(requestCode){
                 930->{
