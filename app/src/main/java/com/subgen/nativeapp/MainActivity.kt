@@ -14,6 +14,7 @@ import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.media.MediaPlayer
 import android.media.MediaMetadataRetriever
+import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import android.os.Build
 import android.os.Bundle
@@ -360,9 +361,19 @@ class MainActivity : Activity() {
         val file=txt(v,if(path.isNotBlank()&&File(path).exists())File(path).name else "No file selected",10f,cool,monoFont=true)
         sourceLabels[key]=file
         action(v,"▣ SELECT AUDIO FILE"){
-            val pick=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="audio/*"}
-            @Suppress("DEPRECATION") startActivityForResult(pick,code)
+            chooseAudio(code)
         }
+    }
+    private fun chooseAudio(code:Int){
+        val pick=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type="audio/*"
+            // Start in the system Audio category, regardless of the last folder visited.
+            // If unavailable, the system picker falls back to its default location.
+            putExtra(DocumentsContract.EXTRA_INITIAL_URI,
+                DocumentsContract.buildRootUri("com.android.providers.media.documents","audio_root"))
+        }
+        @Suppress("DEPRECATION") startActivityForResult(pick,code)
     }
     private fun slider(parent:LinearLayout,id:String,master:Boolean=false){
         val spec=OriginalStudioControlSpec.slider(id)
@@ -474,8 +485,7 @@ class MainActivity : Activity() {
         val sourceFile=p.getString("neuro:input",null)?.let(::File)
         txt(input,if(sourceFile?.isFile==true)"SOURCE · ${sourceFile.name} · ${sourceFile.length()/1024} KB" else "No spoken recording loaded · Choose source below",11f,bright)
         action(input,"▣ CHOOSE / REPLACE AFFIRMATION AUDIO"){
-            val pick=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="audio/*"}
-            @Suppress("DEPRECATION")startActivityForResult(pick,930)
+            chooseAudio(930)
         }
         txt(input,"Local WAV, MP3, M4A or FLAC when the device supports decoding. Original input is kept intact. Processing normalizes to 24 kHz mono PCM16.",10f,cool)
 
