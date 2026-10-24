@@ -18,7 +18,8 @@ fun main(){
             val voice=File(dir,"voice.wav");HighQualityPcm.writeVoice(voice,samples,24000)
             HighQualityPcm.Reader(voice).use{r->samples.forEachIndexed{i,v->check(r.at(i.toLong(),0)==v.toDouble())}}
             val target=File(dir,"voice24.wav");HighQualityPcm.export24(voice,target,24000,1,ceilingDb=0.0)
-            HighQualityPcm.Reader(target).use{r->check(r.info.bits==24);check(abs(r.at(0,0))>0.0)
+            check(target.length()==60L){"Odd PCM24 data chunk must have a RIFF alignment byte"}
+            HighQualityPcm.Reader(target).use{r->check(r.info.bits==24&&r.info.frames==5L);check(abs(r.at(0,0))>0.0)
                 samples.forEachIndexed{i,v->check(abs(r.at(i.toLong(),0)-v)<2.5/8388608.0)}}
         }
         test("PCM24 input and float32 stereo preserve channels and frame count"){
@@ -33,6 +34,17 @@ fun main(){
             HighQualityPcm.Reader(down).use{r->var squares=0.0
                 for(i in 100L until r.info.frames-100)squares+=r.at(i,0).pow(2)
                 check(sqrt(squares/(r.info.frames-200))<.01)}
+            val pcm16=File(dir,"20khz16.wav")
+            HighQualityPcm.Reader(high).use{r->HighQualityPcm.Writer(pcm16,r.info.frames,48000,1,16,false).use{w->
+                for(i in 0 until r.info.frames)w.put(r.at(i,0));w.finish()}}
+            val standard=File(dir,"alias-standard.wav");val hq=File(dir,"alias-hq.wav")
+            val settings=NativeSubliminal.Settings(pcm16,null,null,null,1,32000)
+            NativeSubliminal.mix(settings,standard,{}){false}
+            HighQualityMixer.mix(settings,hq,File(dir,"alias-cache"),{}){false}
+            fun rms(file:File):Double=HighQualityPcm.Reader(file).use{r->var sum=0.0
+                for(i in 1000L until r.info.frames-1000)sum+=r.at(i,0).pow(2)
+                sqrt(sum/(r.info.frames-2000))}
+            check(rms(hq)<rms(standard)*.05){"HQ must suppress the alias, not just change the container bit depth"}
         }
         test("HQ narration retains exact speech order, phase gain and 1.5 seconds of digital silence"){
             val a=tone("a.wav",seconds=.1);val b=tone("b.wav",seconds=.2,hz=1100.0)

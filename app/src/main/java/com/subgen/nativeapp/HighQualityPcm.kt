@@ -77,7 +77,7 @@ object HighQualityPcm {
             output=BufferedOutputStream(FileOutputStream(temp),131072)
             fun s16(n:Int){output.write(n and 255);output.write(n ushr 8 and 255)}
             fun s32(n:Long){repeat(4){output.write((n ushr (8*it) and 255).toInt())}}
-            output.write("RIFF".toByteArray());s32(36+size);output.write("WAVEfmt ".toByteArray());s32(16)
+            output.write("RIFF".toByteArray());s32(36+size+(size and 1L));output.write("WAVEfmt ".toByteArray());s32(16)
             s16(if(floating)3 else 1);s16(channels);s32(rate.toLong());s32((rate*channels*(bits/8)).toLong())
             s16(channels*(bits/8));s16(bits);output.write("data".toByteArray());s32(size)
         }
@@ -93,7 +93,9 @@ object HighQualityPcm {
         private fun flush(){if(used>0){output.write(buffer,0,used);used=0}}
         fun finish(){
             check(samples==frames*channels){"Incomplete PCM: $samples/${frames*channels}"}
-            flush();output.close();publish(temp,target);done=true
+            flush()
+            if((frames*channels*(bits/8)) and 1L != 0L)output.write(0)
+            output.close();publish(temp,target);done=true
         }
         override fun close(){if(!done){runCatching{output.close()};temp.delete()}}
     }
