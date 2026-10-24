@@ -1,7 +1,8 @@
-# Build SubGen Native v3.2.2
+# Build SubGen Native v3.2.3
 
 The source includes the existing three native engines and optional High Quality
-outputs. See `CHANGELOG-v3.2.2.md` for behavior and format limits.
+outputs. See `CHANGELOG-v3.2.2.md` for quality behavior and format limits, and
+`CHANGELOG-v3.2.3.md` for Samsung My Files audio selection.
 
 ## Build environment
 
@@ -36,7 +37,7 @@ cache, cancellation, snapshot and 20-minute synthetic export tests.
 
 - Debug: `app/build/outputs/apk/debug/app-debug.apk`, a separate `.hypertest` app.
 - Stable candidate: `app/build/outputs/apk/release/app-release-unsigned.apk`.
-- Stable identity: `com.subgen.nativeapp.stable`, version code 16.
+- Stable identity: `com.subgen.nativeapp.stable`, version code 17.
 
 The release must be signed offline with the existing private update key for
 installation over an earlier stable version. The key and its password are not
