@@ -40,7 +40,7 @@ object HypnosisBackgroundMixer {
                     val fade=min(120L,loopFrames/4)
                     if (fade==0L || position>=fade) return primary
                     val fraction=position.toDouble()/fade
-                    val tail=reader.at(loopFrames-fade+position,ch.coerceAtMost(reader.info.channels-1))
+                    val tail=reader.at(loopFrames-1,ch.coerceAtMost(reader.info.channels-1))
                     return tail*(1.0-fraction)+primary*fraction
                 }
                 fun mixed(frame:Long,ch:Int):Double {
