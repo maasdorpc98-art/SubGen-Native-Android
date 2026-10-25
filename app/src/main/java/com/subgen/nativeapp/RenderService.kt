@@ -174,6 +174,13 @@ class RenderService:Service() {
             peakCeiling=(p.getString("select:ctrl-normalize","0.912")?.toDoubleOrNull()?:.912).coerceIn(.1,1.0),
             highPassHz=hpf.toDouble(),lowPassHz=lpf.toDouble()
         )
+        // Read-only audit: the three source gains and audio processing remain untouched.
+        val synergyAudit=ThreeLayerSynergyAudit.review(settings)
+        if(synergyAudit.applicable){
+            Diagnostics.record("THREE_LAYER_SYNERGY_AUDIT",synergyAudit.summary,
+                org.json.JSONObject().put("passed",synergyAudit.clean)
+                    .put("issues",org.json.JSONArray(synergyAudit.issues)))
+        }
         Diagnostics.expectedOutput(duration.toLong()*rate*4L+44)
         Diagnostics.stage("SUBLIMINAL_MIX",org.json.JSONObject().put("durationSeconds",duration).put("sampleRate",rate))
         StateStore.active(this,true)
