@@ -38,7 +38,7 @@ object WordPacing {
                 }
             }
             if(!nextSpeech)continue // Never append extra silence after the final spoken block.
-            val words=speech.text.trim().split(Regex("\s+")).count{it.isNotBlank()}
+            val words=speech.text.trim().split(Regex("\\s+")).count{it.isNotBlank()}
             val minimumFrames=(words*60.0*rate/targetWpm).roundToLong()
             val extra=max(0L,minimumFrames-clipFrames[i]-pauseFrames)
             extras[i]=extra
