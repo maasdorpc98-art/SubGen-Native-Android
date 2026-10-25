@@ -22,9 +22,12 @@ fun main(){
     val disabled=File(dir,"disabled.wav")
     val paced=File(dir,"paced.wav")
     WavIO.assemble(nodes,listOf(speech,null,speech),original)
-    WavIO.assemble(nodes,listOf(speech,null,speech),disabled,pacingWpm=null)
+    val unchanged=WordPacing.augment(nodes,listOf(speech,null,speech),24000,null){WavIO.loadMono(it).frames}
+    WavIO.assemble(unchanged.first,unchanged.second,disabled)
     check(original.readBytes().contentEquals(disabled.readBytes())){"OFF must preserve byte-for-byte baseline"}
-    WavIO.assemble(nodes,listOf(speech,null,speech),paced,pacingWpm=60)
+    val expanded=WordPacing.augment(nodes,listOf(speech,null,speech),24000,60){WavIO.loadMono(it).frames}
+    check(expanded.first.size==nodes.size+1)
+    WavIO.assemble(expanded.first,expanded.second,paced)
     check(WavIO.loadMono(speech).rate==24000)
     check(plan.extraFrames[0]==144000L)
     check(paced.length()-original.length()==6L*24000*2*2)
