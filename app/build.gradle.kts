@@ -9,7 +9,7 @@ android {
         targetSdk = 34
         manifestPlaceholders["appLabel"] = "Subliminal Studio Native"
         versionCode = 16
-        versionName = "3.2.2-high-quality"
+        versionName = "3.2.2-three-layer-safety"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     buildTypes {
