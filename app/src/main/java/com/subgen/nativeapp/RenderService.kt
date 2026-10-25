@@ -211,6 +211,8 @@ class RenderService:Service() {
         val voice=prefs.getString("voice","SERENA")?:"SERENA"
         val sid=KokoroNative.voices[voice]?:3
         val speed=prefs.getFloat("speed",VoiceSpeed.DEFAULT).coerceIn(.65f,1.2f)
+        val pacingWpm=if(prefs.getBoolean("hyp:wpmEnabled",false))prefs.getInt("hyp:wpm",WordPacing.DEFAULT) else null
+        if(pacingWpm!=null)require(pacingWpm in WordPacing.MIN..WordPacing.MAX){"Invalid WPM pacing target"}
         // Native throughput is independent from speech speed and output WAV quality.
         var threads=InferenceTuner.threads(this)
         Diagnostics.record("SPEED_ENGINE","FP32 + adaptive inference workers + cache-first pipeline")
@@ -339,8 +341,8 @@ class RenderService:Service() {
         require(requestedRate in OutputFormat.rates){"Unsupported output sample rate"}
         // Binaural separation requires stereo. Keep the stored preference unchanged.
         val binaural=(prefs.getBoolean("binaural",false) && outChannels==2)
-        val sec=if(hq)HighQualityNarration.assemble(nodes,checkpointFiles,path,binaural){cancelled.get()} else WavIO.assemble(nodes,checkpointFiles,path,binOn=binaural)
-        Diagnostics.record("WAV_ASSEMBLY_COMPLETED","",org.json.JSONObject()
+        val sec=if(hq)HighQualityNarration.assemble(nodes,checkpointFiles,path,binaural,pacingWpm){cancelled.get()} else WavIO.assemble(nodes,checkpointFiles,path,binOn=binaural,pacingWpm=pacingWpm)
+        Diagnostics.record("WAV_ASSEMBLY_COMPLETED","",org.json.JSONObject().put("wpmPacingTarget",pacingWpm?:"OFF")
             .put("elapsedMs",SystemClock.elapsedRealtime()-assembleStart)
             .put("durationSeconds",sec).put("bytes",path.length()))
         if(cancelled.get()){update("Cancelled before export; speech cache is safe");return}
