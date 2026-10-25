@@ -341,7 +341,10 @@ class RenderService:Service() {
         require(requestedRate in OutputFormat.rates){"Unsupported output sample rate"}
         // Binaural separation requires stereo. Keep the stored preference unchanged.
         val binaural=(prefs.getBoolean("binaural",false) && outChannels==2)
-        val sec=if(hq)HighQualityNarration.assemble(nodes,checkpointFiles,path,binaural,pacingWpm){cancelled.get()} else WavIO.assemble(nodes,checkpointFiles,path,binOn=binaural,pacingWpm=pacingWpm)
+        val (assemblyNodes,assemblyFiles)=WordPacing.augment(nodes,checkpointFiles,24000,pacingWpm){file->
+            if(hq)HighQualityNarration.frames(file) else WavIO.loadMono(file).frames
+        }
+        val sec=if(hq)HighQualityNarration.assemble(assemblyNodes,assemblyFiles,path,binaural){cancelled.get()} else WavIO.assemble(assemblyNodes,assemblyFiles,path,binOn=binaural)
         Diagnostics.record("WAV_ASSEMBLY_COMPLETED","",org.json.JSONObject().put("wpmPacingTarget",pacingWpm?:"OFF")
             .put("elapsedMs",SystemClock.elapsedRealtime()-assembleStart)
             .put("durationSeconds",sec).put("bytes",path.length()))
