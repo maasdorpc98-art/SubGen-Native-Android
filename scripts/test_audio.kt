@@ -12,7 +12,7 @@ fun main(){
     check(sec==2.25) {"Unexpected duration $sec"}
     check(result.length()==44L+(2.25*24000*4).toLong()) {"Unexpected WAV bytes ${result.length()}"}
     val sub=File(base,"subliminal.wav")
-    NativeSubliminal.mix(NativeSubliminal.Settings(input,null,input,null,1,50,100),sub,{}, {false})
-    check(sub.length()==44+60L*24000*4)
+    NativeSubliminal.mix(NativeSubliminal.Settings(input,null,input,null,durationSeconds=2,rate=32000,primaryDb=-6.0),sub,{}, {false})
+    check(sub.length()==44+2L*32000*4)
     println("PASS: checkpoint WAV format, 250ms exact silence, native mix time, output WAV size")
 }

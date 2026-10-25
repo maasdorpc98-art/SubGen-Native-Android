@@ -1,0 +1,132 @@
+{
+  "ctrl-duration": [
+    {
+      "label": "1 minute",
+      "value": "1"
+    },
+    {
+      "label": "2 minutes",
+      "value": "2"
+    },
+    {
+      "label": "3 minutes",
+      "value": "3"
+    },
+    {
+      "label": "4 minutes",
+      "value": "4"
+    },
+    {
+      "label": "5 minutes",
+      "value": "5"
+    },
+    {
+      "label": "8 minutes",
+      "value": "8"
+    },
+    {
+      "label": "10 minutes",
+      "value": "10"
+    },
+    {
+      "label": "15 minutes",
+      "value": "15"
+    },
+    {
+      "label": "20 minutes",
+      "value": "20"
+    },
+    {
+      "label": "30 minutes",
+      "value": "30"
+    },
+    {
+      "label": "Custom…",
+      "value": "custom"
+    }
+  ],
+  "ctrl-memory-mode": [
+    {
+      "label": "Smart · use audio needed for the export",
+      "value": "smart"
+    },
+    {
+      "label": "Memory Saver · repeat first 3 minutes",
+      "value": "saver"
+    },
+    {
+      "label": "Full originals · highest memory use",
+      "value": "full"
+    }
+  ],
+  "ctrl-samplerate": [
+    {
+      "label": "32000 Hz",
+      "value": "32000"
+    },
+    {
+      "label": "44100 Hz",
+      "value": "44100"
+    },
+    {
+      "label": "48000 Hz",
+      "value": "48000"
+    }
+  ],
+  "ctrl-normalize": [
+    {
+      "label": "−0.8 dBFS",
+      "value": "0.92"
+    },
+    {
+      "label": "−0.2 dBFS",
+      "value": "0.98"
+    },
+    {
+      "label": "−3.1 dBFS — safe",
+      "value": "0.70"
+    },
+    {
+      "label": "−6.0 dBFS",
+      "value": "0.50"
+    }
+  ],
+  "named-preset-select": [
+    {
+      "label": "Choose a saved preset…",
+      "value": ""
+    }
+  ],
+  "ctrl-rhythmic-shape": [
+    {
+      "label": "Isochronic / Gated",
+      "value": "gated"
+    },
+    {
+      "label": "Smooth AM / Sine",
+      "value": "sine"
+    }
+  ],
+  "ctrl-secondary-tone": [
+    {
+      "label": "Normal · untouched",
+      "value": "normal"
+    },
+    {
+      "label": "Calm · gently softened",
+      "value": "calm"
+    },
+    {
+      "label": "Sleepy · darker / softer highs",
+      "value": "sleepy"
+    },
+    {
+      "label": "Deep · darker / warmer color",
+      "value": "deep"
+    },
+    {
+      "label": "Excited · lighter / brighter color",
+      "value": "excited"
+    }
+  ]
+}

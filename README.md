@@ -1,3 +1,13 @@
+# v3.2.0 HYPER production integration
+
+Native optional production tools now sit within Hypnosis. Normal use remains **Paste → Create → Export**. Kokoro FP32, Studio and NeuroModulation A/B/A+B are retained.
+
+See `CHANGELOG-HYPER-v3.2.0.md`, `FEATURE-ACCEPTANCE-v3.2.0.md`, `TEST-RESULTS-v3.2.0.md` and `INSTALL-AND-ROLLBACK-v3.2.0.md` for implementation, evidence and limits. The acoustic syntax remains the documented v3.1.1 contract; the new tools do not add hypnotic commands or rewrite narration.
+
+The release retains the stable package ID and original stable signer, compared against v3.1.3. VersionCode 14 permits an in-place upgrade without intentional data clearing. Developer debug builds use a separate `.hypertest` ID. Samsung installation/UI/listening acceptance and real-session verification remain outstanding.
+
+---
+
 > **Build candidate, not a compiled or proven APK.** See [BUILD-INSTRUCTIONS.md](BUILD-INSTRUCTIONS.md).
 
 # Sub Gen Native v2.1 — Android native rebuild (SOURCE PREVIEW)

@@ -4,14 +4,16 @@ android {
     namespace = "com.subgen.nativeapp"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.subgen.nativeapp.studio"
+        applicationId = "com.subgen.nativeapp.stable"
         minSdk = 29
         targetSdk = 34
-        versionCode = 2
-        versionName = "2.2-studio-restored"
+        manifestPlaceholders["appLabel"] = "Subliminal Studio Native"
+        versionCode = 16
+        versionName = "3.2.2-three-layer-safety"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     buildTypes {
+        debug { applicationIdSuffix = ".hypertest"; versionNameSuffix = "-test"; manifestPlaceholders["appLabel"] = "SubGen v3.2.2 Test" }
         release { isMinifyEnabled = false }
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
@@ -23,4 +25,5 @@ android {
 dependencies {
     implementation("org.apache.commons:commons-compress:1.27.1")
     implementation("commons-io:commons-io:2.16.1")
+    implementation("org.tukaani:xz:1.10")
 }

@@ -1,0 +1,20 @@
+{
+  "filename": "SubGen-Native-v3.2.2-High-Quality-Stable-Update.apk",
+  "bytes": 17124066,
+  "sha256": "c58208dec42652bbaa6fa116fc3062e739bf051bc560f00cc12d492d2d752f5f",
+  "package": "com.subgen.nativeapp.stable",
+  "version_code": 16,
+  "version_name": "3.2.2-high-quality",
+  "signer_sha256": "37c823a64caae27f705c6e1b2736ba2b6081f3b144e96a9337defd85f1131f9e",
+  "previous_signer_matches": true,
+  "code_commit": "27ac308e9f410971d6e93b40e9961883aa99eb4a",
+  "ci_run": "https://github.com/maasdorpc98-art/SubGen-Native-Android/actions/runs/40124057490",
+  "ci_result": "success",
+  "high_quality_test_groups": 14,
+  "hyper_test_groups": 23,
+  "protected_runtime_and_presets_unchanged": true,
+  "synthetic_long_export_seconds": 1200,
+  "neural_engine": "original FP32 Kokoro unchanged",
+  "device_acceptance": "Samsung install, listening and timing not tested",
+  "synthetic_long_export_java_heap_limit_mb": 256
+}

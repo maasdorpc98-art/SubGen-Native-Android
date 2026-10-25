@@ -1,0 +1,9 @@
+/.gradle/
+/app/build/
+/build/
+/local.properties
+/app/src/main/jniLibs/
+/app/src/main/java/com/k2fsa/
+/test-results/
+*.jks
+*.keystore

@@ -1,0 +1,16 @@
+{
+  "app/src/main/java/com/subgen/nativeapp/KokoroNative.kt": "d54dfe6a15df091451aa0cdbbf73d3d9541ab24a4b6d3339e9482bc7e0d4208d",
+  "app/src/main/java/com/subgen/nativeapp/ModelInstaller.kt": "55cadb7bb7dd944d78ac7dbd5900a5984fb73f7ee96129ddb4ce600aacf96923",
+  "app/src/main/java/com/subgen/nativeapp/VoiceDirection.kt": "6afbdd2ad70547597b377b99c7f661530b611bd7166f9359bba2e403b601211a",
+  "app/src/main/java/com/subgen/nativeapp/VoiceSpeed.kt": "5a00be1087dac6bc255073ae7f336ecbfdc27156b012489a8ff5fc7bf3de0682",
+  "app/src/main/java/com/subgen/nativeapp/WavIO.kt": "0ba162c82293ff081d988a8d5f9b9ff53102210295881c3436e2029838c9dac0",
+  "app/src/main/java/com/subgen/nativeapp/OutputFormat.kt": "bbe6c97c1d73f1fadf7967276b52069610fd4459491610a6f664c7312033784d",
+  "app/src/main/java/com/subgen/nativeapp/NativeSubliminal.kt": "52d3625949648f0ee2b5c9a8ddba6bf985a5764763f5b45b54c004800871ace5",
+  "app/src/main/java/com/subgen/nativeapp/NeuroModulationA.kt": "092e07aa85db428e49faf5ad5300b7d7d1e7cdad3d6b7769caa69b0189e01729",
+  "app/src/main/java/com/subgen/nativeapp/NeuroModulationB.kt": "965b22c1cb89072c880b0574a4e9bb5c4296cb7f7b8ba02b044a7fc4a2185b52",
+  "app/src/main/java/com/subgen/nativeapp/NeuroModulationService.kt": "fa8fbb738dd541f7e254a0e9e45baa754330a8234318e665b6f1f7e7afb0dc53",
+  "app/src/main/java/com/subgen/nativeapp/OriginalStudioControlSpec.kt": "baf963dba07efe2b23c46e90f00c32c2cb266871296aed3c3e468635b1a0829f",
+  "app/src/main/java/com/subgen/nativeapp/OriginalStudioSliderView.kt": "865cb2ad2dd8828de2def7de66bbc1a88e602100de17f3c18a2c3f53355edf8a",
+  "app/src/main/assets/original-presets.json": "832d43b0eba6d8681952b9d19ef687443690ba738887a723db2405323cfb0e92",
+  "app/src/main/assets/original-selects.json": "465e649683d8e9ec4d7f57a6fc883764a44403ee9592b90bec6dc8610599fb48"
+}
