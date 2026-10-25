@@ -12,11 +12,20 @@ object ScriptTimeline {
                        val rows:List<Row>, val lowerSeconds:Double=0.0,
                        val upperSeconds:Double=0.0, val invalidCommands:Int=0)
     fun analyze(script:String,speed:Float=VoiceSpeed.DEFAULT,breathe:Double=5.0,paragraph:Double=3.0,
-                direction:VoiceDirection.Config=VoiceDirection.Config()):Summary {
+                direction:VoiceDirection.Config=VoiceDirection.Config(),wpm:Int?=null):Summary {
         val nodes=ScriptParser.parse(script,breathe,paragraph,maxSpeechChars=160)
+        val estimatedFrames=LongArray(nodes.size){i->
+            val node=nodes[i] as? ScriptNode.Speech
+            if(node==null)0L else {
+                val words=node.text.trim().split(Regex("\\s+")).count{it.isNotBlank()}
+                val resolved=runCatching{VoiceDirection.resolve(node,speed,direction)}.getOrNull()
+                if(resolved==null)0L else (words*60.0*24000/(145.0*resolved.speed)).roundToLong()
+            }
+        }
+        val pacing=WordPacing.plan(nodes,estimatedFrames,24000,wpm)
         var at=0.0;var silence=0.0;var speech=0.0;var spoken=0;var pauses=0;var sections=0;var words=0;var invalid=0
         val markers=mutableListOf<String>();val rows=mutableListOf<Row>()
-        nodes.forEach{node-> when(node){
+        nodes.forEachIndexed{index,node-> when(node){
             is ScriptNode.Section->{sections++;markers+=node.name;rows+=Row(at,"SECTION",node.name)}
             is ScriptNode.Speech->{
                 spoken++
@@ -37,6 +46,11 @@ object ScriptTimeline {
                     (if(node.explicitPhaseMode)"phase="+(node.acousticPhase?:"GLOBAL") else "legacy phase="+resolved.section)+
                     " · "+node.text.take(88)))
                 speech+=seconds;at+=seconds
+                val extra=pacing.extraFrames[index].toDouble()/24000.0
+                if(extra>0){
+                    rows+=Row(at,"WPM PACING",String.format(Locale.US,"%.2f sec added between spoken passages",extra))
+                    silence+=extra;at+=extra
+                }
             }
             is ScriptNode.Pause->{
                 pauses++
