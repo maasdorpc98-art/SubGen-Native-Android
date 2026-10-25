@@ -350,10 +350,36 @@ class RenderService:Service() {
         val formatStart=SystemClock.elapsedRealtime()
         val outputDb=prefs.getFloat("hyp:outputDb",0f).toDouble().coerceIn(-30.0,12.0)
         val ceilingDb=prefs.getFloat("hyp:peakDb",-1f).toDouble().coerceIn(-12.0,0.0)
-        val formatted=if(hq){
-            val q=HighQualityPcm.export24(path,finalPath,requestedRate,outChannels,volumeDb=outputDb,ceilingDb=ceilingDb){cancelled.get()}
-            OutputFormat.Result(q.seconds,q.bytes,q.peak,q.appliedGainDb,q.rate,q.channels)
-        }else OutputFormat.convert(path,finalPath,requestedRate,outChannels,volumeDb=outputDb,ceilingDb=ceilingDb)
+        val backgroundLayers=HypnosisBackgroundMixer.selected(prefs)
+        val layeredPath=File(cacheDir,"hypnosis-layered.wav")
+        val preparedLoops=mutableListOf<File>()
+        val formatted=try {
+            val mixingInput=if(backgroundLayers.isEmpty())path else {
+                Diagnostics.stage("HYPNOSIS_BACKGROUND_MIX")
+                update("Mixing optional looping background audio…")
+                val decoded=backgroundLayers.mapIndexed {index,layer->
+                    val prepared=if(HighQualityPcm.supported(layer.file))layer.file
+                        else NativeInputDecoder.prepare(layer.file,::update){cancelled.get()}
+                    val sourceInfo=HighQualityPcm.inspect(prepared)
+                    val converted=if(sourceInfo.rate==24000 && layer.speed==1.0)prepared else {
+                        val tmp=File(cacheDir,"hyp-bg-resampled-$index.wav")
+                        preparedLoops.add(tmp)
+                        HighQualityPcm.resample(prepared,tmp,24000,sourceInfo.channels,
+                            speed=layer.speed,stop={cancelled.get()})
+                        tmp
+                    }
+                    layer.copy(file=converted)
+                }
+                HypnosisBackgroundMixer.mix(path,layeredPath,decoded,hq){cancelled.get()}
+                Diagnostics.record("HYPNOSIS_BACKGROUND_MIXED",
+                    extra=org.json.JSONObject().put("layers",decoded.size).put("seconds",sec))
+                layeredPath
+            }
+            if(hq){
+                val q=HighQualityPcm.export24(mixingInput,finalPath,requestedRate,outChannels,volumeDb=outputDb,ceilingDb=ceilingDb){cancelled.get()}
+                OutputFormat.Result(q.seconds,q.bytes,q.peak,q.appliedGainDb,q.rate,q.channels)
+            }else OutputFormat.convert(mixingInput,finalPath,requestedRate,outChannels,volumeDb=outputDb,ceilingDb=ceilingDb)
+        }finally {layeredPath.delete();preparedLoops.forEach{it.delete()}}
         val bytesPerSample=if(hq)3 else 2
         Diagnostics.record("WAV_OUTPUT_FORMAT_COMPLETED","",org.json.JSONObject()
             .put("elapsedMs",SystemClock.elapsedRealtime()-formatStart)
