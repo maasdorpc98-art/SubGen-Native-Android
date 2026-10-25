@@ -715,6 +715,48 @@ class MainActivity : Activity() {
             p.edit().putFloat("speed",VoiceSpeed.DEFAULT).apply()
             refreshHyp?.invoke()
         }
+        val wpmPanel=panel(session,fill=Color.rgb(21,25,43),border=Color.rgb(88,76,130),padding=12)
+        txt(wpmPanel,"WORDS PER MINUTE · INDEPENDENT PACING",11f,Color.rgb(225,213,255),monoFont=true)
+        txt(wpmPanel,"Adds spacing BETWEEN spoken passages. Voice Speed and pitch are unchanged. Explicit [PAUSE] time counts toward the target. Faster WPM cannot speed up speech. OFF keeps original timing.",10f,cool)
+        val currentWpm=p.getInt("hyp:wpm",WordPacing.DEFAULT).coerceIn(WordPacing.MIN,WordPacing.MAX)
+        val wpmLabel=txt(wpmPanel,"",11f,Color.rgb(225,213,255),monoFont=true)
+        val wpmEnabled=CheckBox(this).apply{
+            setTextColor(bright);isChecked=p.getBoolean("hyp:wpmEnabled",false)
+            bindOnOffLabel("ENABLE WPM PACING"){checked->
+                p.edit().putBoolean("hyp:wpmEnabled",checked).apply()
+                wpmLabel.text=if(checked)"TARGET · ${p.getInt("hyp:wpm",WordPacing.DEFAULT)} WPM" else "WPM PACING · OFF (NATIVE)"
+                refreshHyp?.invoke()
+            }
+        }
+        wpmPanel.addView(wpmEnabled,params(d(48)))
+        wpmLabel.text=if(wpmEnabled.isChecked)"TARGET · $currentWpm WPM" else "WPM PACING · OFF (NATIVE)"
+        val wpmBar=SeekBar(this).apply{
+            max=WordPacing.MAX-WordPacing.MIN
+            progress=currentWpm-WordPacing.MIN
+            progressTintList=ColorStateList.valueOf(violet)
+            thumbTintList=ColorStateList.valueOf(Color.rgb(173,147,250))
+        }
+        wpmPanel.addView(wpmBar,params())
+        txt(wpmPanel,"50 WPM SLOW  ·  100 WPM  ·  180 WPM",9f,cool,monoFont=true)
+        wpmBar.setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener{
+            override fun onStartTrackingTouch(s:SeekBar){}
+            override fun onStopTrackingTouch(s:SeekBar){}
+            override fun onProgressChanged(s:SeekBar,n:Int,user:Boolean){
+                val selected=WordPacing.MIN+n
+                if(user){
+                    p.edit().putInt("hyp:wpm",selected).apply()
+                    refreshHyp?.invoke()
+                }
+                wpmLabel.text=if(wpmEnabled.isChecked)"TARGET · $selected WPM" else "WPM PACING · OFF (NATIVE) · $selected WPM READY"
+            }
+        })
+        action(wpmPanel,"↺ RESET WPM · 100 (OFF)"){
+            p.edit().putInt("hyp:wpm",WordPacing.DEFAULT).putBoolean("hyp:wpmEnabled",false).apply()
+            wpmBar.progress=WordPacing.DEFAULT-WordPacing.MIN
+            wpmEnabled.isChecked=false
+            wpmLabel.text="WPM PACING · OFF (NATIVE)"
+            refreshHyp?.invoke()
+        }
         val pack=if(ModelInstaller(this).present())"OFFLINE VOICES INSTALLED" else "INSTALL OFFLINE VOICE PACK"
         action(session,pack,"aqua"){startAction(RenderService.ACTION_INSTALL)}
         action(session,"BENCHMARK · FIND FASTEST CPU SETTING"){startAction(RenderService.ACTION_BENCHMARK)}
@@ -839,9 +881,9 @@ class MainActivity : Activity() {
         val timeline=panel(check,fill=Color.rgb(17,24,32),border=Color.rgb(76,61,119),radius=11,padding=13,margin=5)
         val previewLines=txt(timeline,"",10f,cool,monoFont=true)
         action(check,"VIEW FULL SCRIPT TIMELINE") {
-            val summary=ScriptTimeline.analyze(field.text.toString(),p.getFloat("speed",VoiceSpeed.DEFAULT),breathe=p.getFloat("hyp:breatheSec",5f).toDouble(),paragraph=p.getFloat("hyp:paragraphSec",3f).toDouble(),direction=VoiceDirectionStore.read(p))
+            val summary=ScriptTimeline.analyze(field.text.toString(),p.getFloat("speed",VoiceSpeed.DEFAULT),breathe=p.getFloat("hyp:breatheSec",5f).toDouble(),paragraph=p.getFloat("hyp:paragraphSec",3f).toDouble(),direction=VoiceDirectionStore.read(p),wpm=if(p.getBoolean("hyp:wpmEnabled",false))p.getInt("hyp:wpm",WordPacing.DEFAULT) else null)
             val detail=buildString {
-                append("Speech timing is estimated; pauses are exact.\n\n")
+                append("Speech timing is estimated; script pauses are exact. WPM pacing adds estimated inter-passage silence.\n\n")
                 for(row in summary.rows) {
                     append(ScriptTimeline.time(row.seconds))
                     append("  ·  ");append(row.kind);append("  ·  ");append(row.detail);append("\n\n")
@@ -962,11 +1004,12 @@ class MainActivity : Activity() {
         space(info,6)
         val guidance=txt(info,"",10f,cool,monoFont=true)
         updateSummary={
-            val summary=ScriptTimeline.analyze(field.text.toString(),p.getFloat("speed",VoiceSpeed.DEFAULT),breathe=p.getFloat("hyp:breatheSec",5f).toDouble(),paragraph=p.getFloat("hyp:paragraphSec",3f).toDouble(),direction=VoiceDirectionStore.read(p))
+            val summary=ScriptTimeline.analyze(field.text.toString(),p.getFloat("speed",VoiceSpeed.DEFAULT),breathe=p.getFloat("hyp:breatheSec",5f).toDouble(),paragraph=p.getFloat("hyp:paragraphSec",3f).toDouble(),direction=VoiceDirectionStore.read(p),wpm=if(p.getBoolean("hyp:wpmEnabled",false))p.getInt("hyp:wpm",WordPacing.DEFAULT) else null)
             stats.text="SPOKEN BLOCKS  "+summary.speechBlocks+
                 "\nPAUSE BLOCKS  "+summary.pauseBlocks+
                 "\nTOTAL EXACT SILENCE  "+ScriptTimeline.time(summary.silenceSeconds)+
                 "\nWORDS  "+summary.words+
+                "\nWPM TARGET  "+(if(p.getBoolean("hyp:wpmEnabled",false))"${p.getInt("hyp:wpm",WordPacing.DEFAULT)} (pacing)" else "OFF")+
                 "\nESTIMATED SESSION  "+ScriptTimeline.time(summary.totalSeconds)
             val markerNames=summary.markers.joinToString(" · ")
             val hasMain=summary.markers.any { it.contains("SUGGEST",true) || it.contains("MAIN",true) }
