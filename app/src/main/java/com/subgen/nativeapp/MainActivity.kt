@@ -1008,7 +1008,69 @@ class MainActivity : Activity() {
         }
         status=txt(output,"Native Kokoro · Ready",10f,cool,monoFont=true)
         txt(output,"A foreground notification tracks processing. Completed spoken blocks remain saved for later sessions.",10f,cool)
+        val backgrounds=hypSection("06 — OPTIONAL BACKGROUND AUDIO")
+        txt(backgrounds,"Two optional, stationary sources loop independently under hypnosis. The imported affirmation may already contain your frequency modulation.",10f,cool)
+        hypnosisBackgroundSource(backgrounds,"AFFIRMATIONS","hyp:bg:affirm",941,-18f)
+        hypnosisBackgroundSource(backgrounds,"BACKGROUND NOISE / RAIN","hyp:bg:noise",942,-24f)
+        txt(backgrounds,"Speed changes both playback speed and pitch (and any embedded modulation frequency). Both optional loops stop with hypnosis.",10f,cool)
         txt(body,"HYPNOSIS STUDIO v3.2 · Native Android · Optional HYPER production tools",9f,cool,monoFont=true,gravity=Gravity.CENTER)
+    }
+    private fun hypnosisBackgroundSource(parent:LinearLayout,title:String,key:String,code:Int,defaultDb:Float){
+        val c=subCard(parent,title,"OPTIONAL · Stationary looping audio",Color.rgb(88,76,130))
+        val enabled=CheckBox(this).apply{
+            setTextColor(bright);isChecked=p.getBoolean("$key:enabled",false)
+            bindOnOffLabel("ENABLE $title"){on->p.edit().putBoolean("$key:enabled",on).apply()}
+        }
+        c.addView(enabled,params(d(48)))
+        val selected=p.getString("$key:path","").orEmpty()
+        val filename=txt(c,if(selected.isNotEmpty()&&File(selected).isFile)"FILE · ${File(selected).name}" else "NO AUDIO SELECTED",10f,cool,monoFont=true)
+        sourceLabels[key]=filename
+        action(c,"▣ SELECT $title AUDIO"){chooseAudio(code)}
+        action(c,"✕ CLEAR $title AUDIO"){
+            if(StateStore.active(this)){Toast.makeText(this,"Finish render before changing audio",Toast.LENGTH_LONG).show();return@action}
+            p.edit().remove("$key:path").putBoolean("$key:enabled",false).apply()
+            showTab("hypnosis")
+        }
+        val volumeLabel=txt(c,"VOLUME",10f,Color.rgb(225,213,255),monoFont=true)
+        val volume=SeekBar(this).apply{
+            max=600
+            progress=((p.getFloat("$key:volumeDb",defaultDb)+60f)*10).roundToInt().coerceIn(0,600)
+            progressTintList=ColorStateList.valueOf(violet)
+        }
+        c.addView(volume,params())
+        volumeLabel.text=String.format(Locale.US,"VOLUME · %.1f dB",p.getFloat("$key:volumeDb",defaultDb))
+        volume.setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener{
+            override fun onStartTrackingTouch(s:SeekBar){}
+            override fun onStopTrackingTouch(s:SeekBar){}
+            override fun onProgressChanged(s:SeekBar,n:Int,user:Boolean){
+                val db=n/10f-60f
+                volumeLabel.text=String.format(Locale.US,"VOLUME · %.1f dB",db)
+                if(user)p.edit().putFloat("$key:volumeDb",db).apply()
+            }
+        })
+        val speedLabel=txt(c,"SPEED",10f,Color.rgb(225,213,255),monoFont=true)
+        val speed=SeekBar(this).apply{
+            max=30
+            progress=((p.getFloat("$key:speed",1f)-0.5f)*20).roundToInt().coerceIn(0,30)
+            progressTintList=ColorStateList.valueOf(violet)
+        }
+        c.addView(speed,params())
+        speedLabel.text=String.format(Locale.US,"SPEED · %.2f×",p.getFloat("$key:speed",1f))
+        speed.setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener{
+            override fun onStartTrackingTouch(s:SeekBar){}
+            override fun onStopTrackingTouch(s:SeekBar){}
+            override fun onProgressChanged(s:SeekBar,n:Int,user:Boolean){
+                val speedValue=0.5f+n*0.05f
+                speedLabel.text=String.format(Locale.US,"SPEED · %.2f×",speedValue)
+                if(user)p.edit().putFloat("$key:speed",speedValue).apply()
+            }
+        })
+        action(c,"↺ RESET VOLUME & SPEED"){
+            p.edit().putFloat("$key:volumeDb",defaultDb).putFloat("$key:speed",1f).apply()
+            volume.progress=((defaultDb+60f)*10).roundToInt();speed.progress=10
+            volumeLabel.text=String.format(Locale.US,"VOLUME · %.1f dB",defaultDb)
+            speedLabel.text="SPEED · 1.00×"
+        }
     }
     private fun hypSection(s:String):LinearLayout{
         val pane=panel(body,fill=Color.rgb(23,29,43),border=Color.rgb(79,63,124),radius=12,padding=16,margin=16)
@@ -1079,6 +1141,30 @@ class MainActivity : Activity() {
                     contentResolver.openOutputStream(uri,"wt")!!.bufferedWriter().use{it.write(manifest)}
                 }
                 923->{contentResolver.openOutputStream(uri,"wt")!!.bufferedWriter().use{it.write(Diagnostics.report().toString(2))}}
+                941,942->{
+                    if(StateStore.active(this))error("Finish render before importing audio")
+                    val key=if(requestCode==941)"hyp:bg:affirm" else "hyp:bg:noise"
+                    val name=runCatching{contentResolver.query(uri,arrayOf(OpenableColumns.DISPLAY_NAME),null,null,null)?.use{cursor->
+                        if(cursor.moveToFirst())cursor.getString(0) else null
+                    }}.getOrNull()?:"background.wav"
+                    val ext=Regex("\\.[A-Za-z0-9]{2,6}$").find(name)?.value?.lowercase(Locale.US)?:" .bin".trim()
+                    Thread({
+                        runCatching{
+                            val target=File(filesDir,if(requestCode==941)"hyp-bg-affirm$ext" else "hyp-bg-noise$ext")
+                            val temp=File(filesDir,if(requestCode==941)"hyp-bg-affirm.partial" else "hyp-bg-noise.partial")
+                            contentResolver.openInputStream(uri)!!.use{input->temp.outputStream().buffered(131072).use{output->input.copyTo(output,131072)}}
+                            require(temp.length()>44){"Selected audio is empty"}
+                            if(target.exists())require(target.delete()){"Cannot replace old background"}
+                            require(temp.renameTo(target)){"Could not store background source"}
+                            p.edit().putString("$key:path",target.absolutePath).putBoolean("$key:enabled",true).apply()
+                            Diagnostics.record("HYPNOSIS_BACKGROUND_IMPORTED",target.name)
+                            runOnUiThread{if(!isFinishing&&activeTab=="hypnosis")showTab("hypnosis")}
+                        }.onFailure{err->
+                            Diagnostics.failure("HYPNOSIS_BACKGROUND_IMPORT_FAILED",err)
+                            runOnUiThread{Toast.makeText(this,"Background import failed: ${err.message}",Toast.LENGTH_LONG).show()}
+                        }
+                    },"hyp-background-import").start()
+                }
                 910->{val script=contentResolver.openInputStream(uri)!!.bufferedReader().use{it.readText()};p.edit().putString("script",script).apply();showTab("hypnosis")}
                 920->{val all=JSONObject(p.getString("namedPresets","{}")?:"{}");contentResolver.openOutputStream(uri,"wt")!!.bufferedWriter().use{it.write(all.toString(2))}}
                 922->{val report=JSONObject().apply{
