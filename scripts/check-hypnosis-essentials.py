@@ -9,7 +9,8 @@ timeline=(src/"ScriptTimeline.kt").read_text()
 for label in ["03 — SCRIPT CHECK + TIMELINE","04 — NEURAL VOICE PREVIEW","05 — OUTPUT / RENDER",
               "FINAL OUTPUT VOLUME","PEAK CEILING","ESTIMATED WAV SIZE","OUTPUT CHANNELS","OUTPUT SAMPLE RATE"]:
     assert label in ui,label
-assert 'OutputFormat.convert(path,finalPath' in render
+assert 'OutputFormat.convert(mixingInput,finalPath' in render
+assert 'if(backgroundLayers.isEmpty())path' in render
 assert 'WavIO.saveToDownloads(this,finalPath,name)' in render
 assert 'p.getInt("hyp:channels",2)' in ui and 'prefs.getInt("hyp:channels",2)' in render
 assert 'ScriptTimeline.analyze(field.text.toString()' in ui
