@@ -16,6 +16,6 @@ assert 'getFloat("speed",VoiceSpeed.DEFAULT)' in service
 assert 'speed:Float=VoiceSpeed.DEFAULT' in timeline
 assert 'getFloat("speed",.84f)' not in ui+service
 assert 'com.subgen.nativeapp.stable' in gradle
-assert 'versionCode = 19' in gradle
+assert 'versionCode = 20' in gradle
 assert 'scripts/test_voice_speed.kt' in (root/'scripts/run-core-tests.sh').read_text()
 print('PASS: 1.0x default across renderer, live slider label, stable package/version identity')
