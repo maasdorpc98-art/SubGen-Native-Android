@@ -271,7 +271,7 @@ class MainActivity : Activity() {
         space(mixer,6)
         txt(mixer,"One Carrier file feeds Normal and 8D. Primary and Secondary stay one layer each on the same base renderer.",10f,cool)
         space(mixer,12)
-        val flow=subCard(mixer,"CARRIER  +  PRIMARY  +  SECONDARY","+ Binaural · OFF  + Rhythmic · OFF  → Master",Color.rgb(49,84,86))
+        val flow=subCard(mixer,"CARRIER  +  PRIMARY  +  SECONDARY","Optional Binaural Beat + Rhythmic Tone → Master",Color.rgb(49,84,86))
         val carrier=subCard(mixer,"≈ Carrier","01 · One audio · Normal + 8D",Color.rgb(71,84,99))
         slider(carrier,"ctrl-vol-carrier")
         expandable(carrier,"▸ Carrier Functions · Normal + 8D ⌄",false){c->
@@ -283,7 +283,7 @@ class MainActivity : Activity() {
         val secondary=subCard(mixer,"◉ Secondary · Affirmation 1 (A)","03 · Standard relationship + optional preset-authorized edits",Color.rgb(85,51,77))
         slider(secondary,"ctrl-vol-noise")
         slider(secondary,"ctrl-master-balance-a",master=true)
-        toggle(secondary,"ctrl-secondary-mod-on","Secondary Preset Modification · OFF")
+        toggle(secondary,"ctrl-secondary-mod-on","Secondary Preset Modification")
         expandable(secondary,"▸ Secondary Functions · Standard + Preset Permission",false){c->
             txt(c,"Optional Secondary speed and tone edits require preset permission.",10f,cool)
             slider(c,"ctrl-secondary-speed")
@@ -292,11 +292,11 @@ class MainActivity : Activity() {
         val balances=subCard(mixer,"Master balance","Carrier versus both affirmations together",Color.rgb(63,70,95))
         slider(balances,"ctrl-master-balance-b",master=true)
         val binaural=subCard(mixer,"🎧 Generated Brainwave Audio","Binaural Beat plus a separate Rhythmic Tone engine.",Color.rgb(55,81,102))
-        toggle(binaural,"ctrl-binaural-on","Binaural Beat · OFF")
+        toggle(binaural,"ctrl-binaural-on","Binaural Beat")
         expandable(binaural,"▸ Binaural Beat Controls 10.0 Hz · 400 Hz center",false){c->
             listOf("ctrl-binaural-volume","ctrl-binaural-beat","ctrl-binaural-center").forEach{slider(c,it)}
         }
-        toggle(binaural,"ctrl-rhythmic-on","Rhythmic Tone · OFF")
+        toggle(binaural,"ctrl-rhythmic-on","Rhythmic Tone")
         expandable(binaural,"▸ Rhythmic Tone Controls 6.0 Hz · Theta range",false){c->
             listOf("ctrl-rhythmic-volume","ctrl-rhythmic-pulse").forEach{slider(c,it)}
             action(c,"DELTA · 2 Hz"){setSliderValue("ctrl-rhythmic-pulse",2.0)}
@@ -314,13 +314,13 @@ class MainActivity : Activity() {
             select(c,"ctrl-memory-mode","MEMORY MODE")
             select(c,"ctrl-samplerate","SAMPLE RATE")
             select(c,"ctrl-normalize","PEAK CEILING")
-            toggle(c,"ctrl-fixed-output-lift","Fixed Output Lift · OFF")
+            toggle(c,"ctrl-fixed-output-lift","Fixed Output Lift")
         }
         txt(mixer,"Affirmations remain stationary and both start at the same time. Only the dedicated 8D Carrier copy moves left/right; generated tones are separate.",10f,cool)
         val layer=section(body,"04 — Shared Affirmation Layer")
         val info=subCard(layer,"◌ ONE LAYER · BOTH AFFIRMATIONS","Primary · Affirmation 1 and Secondary · Affirmation 1 (A) are separate recordings.",Color.rgb(91,66,173))
         txt(info,"Both sources always remain one layer each. They share base speed and shared layer volume.",11f,cool)
-        toggle(layer,"ctrl-affirmation-clarity-on","Affirmation Clarity · OFF")
+        toggle(layer,"ctrl-affirmation-clarity-on","Affirmation Clarity")
         expandable(layer,"Shared affirmation layer",false){c->
             slider(c,"ctrl-na-layer-speed-1")
             slider(c,"ctrl-na-layer-volume-1")
@@ -368,11 +368,13 @@ class MainActivity : Activity() {
     }
     private fun qualityToggle(parent:LinearLayout,key:String,description:String){
         val control=CheckBox(this).apply{
-            text="HIGH QUALITY · 24-BIT WAV";setTextColor(green);textSize=12f
+            setTextColor(green);textSize=12f
             isChecked=p.getBoolean(key,false)
-            setOnCheckedChangeListener{_,enabled->p.edit().putBoolean(key,enabled).apply();showTab(activeTab)}
+            bindOnOffLabel("HIGH QUALITY"){enabled->p.edit().putBoolean(key,enabled).apply();showTab(activeTab)}
         }
-        parent.addView(control,params(d(48)));txt(parent,description,10f,cool)
+        parent.addView(control,params(d(48)))
+        txt(parent,if(control.isChecked)"24-BIT WAV EDITION" else "STANDARD 16-BIT WAV EDITION",10f,cool)
+        txt(parent,description,10f,cool)
     }
     private fun chooseAudio(code:Int){
         if(StateStore.active(this)||p.getBoolean("neuro:active",false)){Toast.makeText(this,"Finish or cancel rendering before replacing source audio",Toast.LENGTH_LONG).show();return}
@@ -428,8 +430,8 @@ class MainActivity : Activity() {
     }
     private fun toggle(parent:LinearLayout,id:String,label:String){
         val value=p.getBoolean("check:$id",false)
-        val c=CheckBox(this).apply{ text=label;setTextColor(cool);textSize=11f;typeface=mono;buttonTintList=ColorStateList.valueOf(green)
-            isChecked=value;setPadding(d(2),d(8),d(2),d(8));setOnCheckedChangeListener{_,on->Diagnostics.interaction("toggle:$id");p.edit().putBoolean("check:$id",on).putString("presetLabel","Custom").apply()}
+        val c=CheckBox(this).apply{setTextColor(cool);textSize=11f;typeface=mono;buttonTintList=ColorStateList.valueOf(green)
+            isChecked=value;setPadding(d(2),d(8),d(2),d(8));bindOnOffLabel(label){on->Diagnostics.interaction("toggle:$id");p.edit().putBoolean("check:$id",on).putString("presetLabel","Custom").apply()}
         }
         parent.addView(c,params());checks[id]=c
     }
@@ -543,24 +545,32 @@ class MainActivity : Activity() {
         val seconds=textEntry(settings,"Output duration (seconds 1–180)","neuro:seconds",p.getString("neuro:seconds","60")?:"60",single=true)
         seconds.inputType=android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
         txt(settings,"B requires enough OFDM capacity for the compressed speech. A requires enough output sample positions for each normalized input sample. Neither truncates silently.",10f,cool)
-        val custom=CheckBox(this).apply{text="CUSTOM FREQUENCY / DEPTH (off = reference values)";textSize=12f;setTextColor(bright);buttonTintList=ColorStateList.valueOf(coral);isChecked=p.getBoolean("neuro:custom",false)}
+        val custom=CheckBox(this).apply{textSize=12f;setTextColor(bright);buttonTintList=ColorStateList.valueOf(coral);isChecked=p.getBoolean("neuro:custom",false)}
         settings.addView(custom,params())
-        val hzLabel=txt(settings,"AM FREQUENCY · ${p.getFloat("neuro:hz",40f)} Hz",11f,coral,true)
+        txt(settings,"OFF uses 40 Hz / 90%. ON uses your slider settings. Moving a slider turns this ON.",10f,cool)
+        val hzLabel=txt(settings,"",11f,coral,true)
         val hz=SeekBar(this).apply{max=199;progress=((p.getFloat("neuro:hz",40f)-.5f)*2).roundToInt().coerceIn(0,199);isEnabled=true}
         settings.addView(hz,params(d(48)))
-        val depthLabel=txt(settings,"AM DEPTH · ${p.getInt("neuro:depth",90)}%",11f,coral,true)
+        val depthLabel=txt(settings,"",11f,coral,true)
         val depth=SeekBar(this).apply{max=98;progress=p.getInt("neuro:depth",90).coerceIn(0,98);isEnabled=true}
         settings.addView(depth,params(d(48)))
+        fun refreshModulationLabels(){
+            val frequency=if(custom.isChecked).5+hz.progress*.5 else 40.0
+            val amount=if(custom.isChecked)depth.progress else 90
+            hzLabel.text=String.format(Locale.US,"AM FREQUENCY · %.1f Hz",frequency)
+            depthLabel.text="AM DEPTH · $amount%"
+        }
         // Sliders stay interactive. Touching either selects custom mode automatically.
         hz.setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener{
-            override fun onProgressChanged(bar:SeekBar?,n:Int,user:Boolean){val v=.5f+n*.5f;hzLabel.text="AM FREQUENCY · $v Hz";if(user){p.edit().putFloat("neuro:hz",v).apply();custom.isChecked=true}}
+            override fun onProgressChanged(bar:SeekBar?,n:Int,user:Boolean){val v=.5f+n*.5f;if(user){p.edit().putFloat("neuro:hz",v).apply();custom.isChecked=true};refreshModulationLabels()}
             override fun onStartTrackingTouch(bar:SeekBar?){};override fun onStopTrackingTouch(bar:SeekBar?){}
         })
         depth.setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener{
-            override fun onProgressChanged(bar:SeekBar?,n:Int,user:Boolean){depthLabel.text="AM DEPTH · $n%";if(user){p.edit().putInt("neuro:depth",n).apply();custom.isChecked=true}}
+            override fun onProgressChanged(bar:SeekBar?,n:Int,user:Boolean){if(user){p.edit().putInt("neuro:depth",n).apply();custom.isChecked=true};refreshModulationLabels()}
             override fun onStartTrackingTouch(bar:SeekBar?){};override fun onStopTrackingTouch(bar:SeekBar?){}
         })
-        custom.setOnCheckedChangeListener{_,enabled->p.edit().putBoolean("neuro:custom",enabled).apply()}
+        custom.bindOnOffLabel("CUSTOM FREQUENCY / DEPTH"){enabled->p.edit().putBoolean("neuro:custom",enabled).apply();refreshModulationLabels()}
+        refreshModulationLabels()
         action(settings,"RESTORE REFERENCE 40 Hz / 90%"){
             p.edit().putBoolean("neuro:custom",false).putFloat("neuro:hz",40f).putInt("neuro:depth",90).apply();showTab("neuro")
         }
@@ -711,9 +721,8 @@ class MainActivity : Activity() {
         val directionPanel=hypSection("VOICE DIRECTION · OPTIONAL")
         txt(directionPanel,"HYPER personality is a WRITING LABEL. Kokoro supports speed; section softness is gain/rate approximation, not neural emotion or true whisper. A script [profile ...] overrides this UI default; [phase ...] selects the acoustic category independently of [SECTION: NAME].",10f,cool)
         val directions=CheckBox(this).apply {
-            text="ENABLE VOICE DIRECTION FOR THIS PROJECT"
             setTextColor(bright);isChecked=p.getBoolean("dir:enabled",false)
-            setOnCheckedChangeListener{_,checked->
+            bindOnOffLabel("VOICE DIRECTION"){checked->
                 p.edit().putBoolean("dir:enabled",checked).apply();refreshHyp?.invoke()
             }
         }

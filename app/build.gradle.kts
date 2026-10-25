@@ -8,12 +8,12 @@ android {
         minSdk = 29
         targetSdk = 34
         manifestPlaceholders["appLabel"] = "Subliminal Studio Native"
-        versionCode = 17
-        versionName = "3.2.3-samsung-audio-picker"
+        versionCode = 18
+        versionName = "3.2.4-clear-switches"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     buildTypes {
-        debug { applicationIdSuffix = ".hypertest"; versionNameSuffix = "-test"; manifestPlaceholders["appLabel"] = "SubGen v3.2.3 Test" }
+        debug { applicationIdSuffix = ".hypertest"; versionNameSuffix = "-test"; manifestPlaceholders["appLabel"] = "SubGen v3.2.4 Test" }
         release { isMinifyEnabled = false }
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }

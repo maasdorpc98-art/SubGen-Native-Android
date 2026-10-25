@@ -125,7 +125,7 @@ class HyperActivity:Activity() {
         val experience=field(layout,"Associated experience",existing?.experience?:"")
         val expected=field(layout,"Optional expected count",existing?.expected?.toString()?:"")
         val phases=field(layout,"Optional preferred phases/sections, comma separated",existing?.preferred?.joinToString(",")?:"")
-        val approved=CheckBox(this).apply{text="This session-specific cue is explicitly authorized";setTextColor(white);isChecked=existing?.authorized?:false;layout.addView(this)}
+        val approved=CheckBox(this).apply{setTextColor(white);isChecked=existing?.authorized?:false;bindOnOffLabel("Session cue authorization");layout.addView(this)}
         val scroll=ScrollView(this).apply{addView(layout)}
         val dialog=AlertDialog.Builder(this).setTitle("Session-specific cue · no script changes").setView(scroll).setPositiveButton("Save",null).setNegativeButton("Cancel",null).create()
         dialog.setOnShowListener{dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener{runCatching{
@@ -144,7 +144,7 @@ class HyperActivity:Activity() {
         label(layout,"",14f).text=highlighted
         button(layout,"Go to exact source"){navigate(h.source)}
         val checks=listOf("Preparation present","Correct cue meaning","Meaningful continuation","No contradictory instruction","Reinforcement appropriate","Reviewed / approved")
-        val boxes=checks.map{s->CheckBox(this).apply{text=s;setTextColor(white);layout.addView(this)}}
+        val boxes=checks.map{s->CheckBox(this).apply{setTextColor(white);bindOnOffLabel(s);layout.addView(this)}}
         val notes=field(layout,"Editorial notes",multiline=true)
         button(layout,"Save cue context review"){
             require(notes.text.isNotBlank()){"Record reviewer notes"}
@@ -216,10 +216,11 @@ class HyperActivity:Activity() {
         val eyes=picker(body,"Eye state",listOf("UNRESOLVED","OPEN","CLOSED"),m.eyes)
         val ending=picker(body,"Ending",listOf("UNRESOLVED","WAKE","SLEEP","LOOP"),m.ending)
         val familiarity=picker(body,"Listener familiarity",listOf("UNRESOLVED","NEW","FAMILIAR"),m.familiarity)
-        val focus=listOf("BODY","MIND","AMPLIFIER").map{x->CheckBox(this).apply{text=x;setTextColor(white);isChecked=x in m.focus;body.addView(this)}}
+        val focusNames=listOf("BODY","MIND","AMPLIFIER")
+        val focus=focusNames.map{x->CheckBox(this).apply{setTextColor(white);isChecked=x in m.focus;bindOnOffLabel(x);body.addView(this)}}
         val session=field(body,"Session ID for cue registry",cfg.optString("sessionId"))
         button(body,"Save optional classification"){
-            val mode=HyperAnalysis.Mode(architecture.selectedItem.toString(),eyes.selectedItem.toString(),ending.selectedItem.toString(),focus.filter{it.isChecked}.map{it.text.toString()}.toSet(),familiarity.selectedItem.toString(),"USER")
+            val mode=HyperAnalysis.Mode(architecture.selectedItem.toString(),eyes.selectedItem.toString(),ending.selectedItem.toString(),focusNames.filterIndexed{i,_->focus[i].isChecked}.toSet(),familiarity.selectedItem.toString(),"USER")
             store.saveConfig(store.config().put("mode",HyperJson.mode(mode)).put("sessionId",session.text.toString().trim()));show(page)
         }
         label(body,"Recording categories can overlap: Foundation / Trigger Installation; Deep Eyes-Closed; Deep Eyes-Open; Continuous Eyes-Open Loop; Continuous Eyes-Closed Loop; Rapid / Booster; Body-Focused; Mind-Focused; Hypnosis / Affirmation Amplifier; Natural Sleep.",12f,muted)
