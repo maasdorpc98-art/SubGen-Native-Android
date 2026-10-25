@@ -18,5 +18,8 @@ services on Android 11 and later; Android 10 retains the visible state label.
 Audio algorithms, format limits, settings keys, defaults and caches are unchanged.
 Package: `com.subgen.nativeapp.stable` · version code 18 · `3.2.4-clear-switches`.
 
-Compilation and regression checks are performed before distribution. Visual,
-TalkBack and installation acceptance require an Android device.
+Validation passed: source checks, core regressions, 23 HYPER groups, 14 High Quality
+groups, storage integration, real-XZ Version B recovery, debug and release builds.
+The signed stable APK was verified against the previous stable certificate and
+the unsigned CI payload. See `RELEASE-VERIFICATION-v3.2.4.json`.
+Visual, TalkBack and installation acceptance still require an Android device.
