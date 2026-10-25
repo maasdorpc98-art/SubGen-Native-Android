@@ -36,7 +36,7 @@ object ScriptTimeline {
                 if(resolved==null){
                     invalid++
                     rows+=Row(at,"ERROR","Invalid effective acoustic setting: "+result.exceptionOrNull()?.message)
-                    return@forEach
+                    return@forEachIndexed
                 }
                 // 145 WPM at 1x is a heuristic; neural PCM remains authoritative.
                 val seconds=count*60.0/(145.0*resolved.speed.toDouble())
