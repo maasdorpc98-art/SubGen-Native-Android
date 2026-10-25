@@ -59,7 +59,8 @@ object WavIO {
     }}
     // Audio is stitched directly from on-disk 16-bit checkpoints, not held in memory.
     fun assemble(nodes:List<ScriptNode>,checkpoints:List<File?>,dest:File,
-        binOn:Boolean=false,centerHz:Double=240.0,beatHz:Double=6.0,beatGain:Double=0.008):Double{
+        binOn:Boolean=false,centerHz:Double=240.0,beatHz:Double=6.0,beatGain:Double=0.008,
+        pacingWpm:Int?=null):Double{
         require(nodes.size==checkpoints.size)
         val sr=24000
         // Open and validate headers once, not repeatedly for every pass.
@@ -75,6 +76,8 @@ object WavIO {
             }
             else -> Unit
         }
+        val pacing=WordPacing.plan(nodes,LongArray(nodes.size){clips[it]?.frames?:0L},sr,pacingWpm)
+        frames+=pacing.totalAddedFrames
         val tmp=File(dest.parentFile,dest.name+".partial")
         FileOutputStream(tmp).buffered(65536).use { out ->
             writeHeader(out,frames,sr,2)
@@ -189,6 +192,7 @@ object WavIO {
                         }
                     }
                     previousGain=targetGain
+                    if(pacing.extraFrames[i]>0L)addPause(pacing.extraFrames[i])
                 }
                 else -> Unit
             }
