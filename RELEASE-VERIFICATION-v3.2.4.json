@@ -1,0 +1,24 @@
+{
+  "filename": "SubGen-Native-v3.2.4-Clear-Switches-Stable-Update.apk",
+  "bytes": 17128162,
+  "sha256": "2355be8b583fc94b719a542af6096f7e7248796d54be450147a6713edcf92f18",
+  "package": "com.subgen.nativeapp.stable",
+  "version_code": 18,
+  "version_name": "3.2.4-clear-switches",
+  "signer_sha256": "37c823a64caae27f705c6e1b2736ba2b6081f3b144e96a9337defd85f1131f9e",
+  "previous_signer_matches": true,
+  "code_commit": "f39e731b3984a68c1070d65f0c114fd221afb69a",
+  "ci_run": "https://github.com/maasdorpc98-art/SubGen-Native-Android/actions/runs/40171300543",
+  "ci_result": "success",
+  "audio_engines_unchanged_from_v3_2_3": true,
+  "native_libraries_and_assets_unchanged": true,
+  "stored_zip_entries_aligned": 2,
+  "checks": "Source checks, core regression, 23 HYPER groups, 14 HQ groups, storage integration, real-XZ B recovery, debug and release compilation",
+  "ui_changes": [
+    "Explicit current ON/OFF states on every checkbox",
+    "High Quality displays selected 16-bit or 24-bit edition",
+    "NeuroMod shows reference values while Custom is OFF and slider values while ON",
+    "HYPER focus identifiers remain separate from display labels"
+  ],
+  "device_acceptance": "Visual layout, TalkBack and Android installation not tested on a physical device"
+}
