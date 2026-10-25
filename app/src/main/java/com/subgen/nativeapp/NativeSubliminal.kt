@@ -4,6 +4,8 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.RandomAccessFile
 import java.nio.ByteOrder
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 import kotlin.math.*
@@ -107,6 +109,8 @@ object NativeSubliminal {
             val clarityStateA=DoubleArray(2);val clarityStateB=DoubleArray(2)
             val clarityA=if(s.clarity && s.primarySpeed>1)1.0-exp(-TAU*(sr*.42/s.primarySpeed)/sr) else 1.0
             val clarityB=if(s.clarity && s.secondarySpeed>1)1.0-exp(-TAU*(sr*.42/s.secondarySpeed)/sr) else 1.0
+            var observedPeak=0.0
+            var peakLimitEvents=0L
             val chunkFrames=4096
             val buf=ByteArray(chunkFrames*4)
             val tmp=File(dest.parentFile,dest.name+".partial")
@@ -149,8 +153,13 @@ object NativeSubliminal {
                         // Keep audio sources stationary: only the Carrier's separate 8D branch pans.
                         val left=(cL*g0+c8L*g1)*fadeGain + speechAL*g2+speechBL*g3+binauralLeft+rhythm
                         val right=(cR*g0+c8R*g1)*fadeGain + speechAR*g2+speechBR*g3+binauralRight+rhythm
-                        val leftPcm=WavIO.floatToS16((left*final).coerceIn(-s.peakCeiling,s.peakCeiling).toFloat())
-                        val rightPcm=WavIO.floatToS16((right*final).coerceIn(-s.peakCeiling,s.peakCeiling).toFloat())
+                        val rawLeft=left*final
+                        val rawRight=right*final
+                        observedPeak=max(observedPeak,max(abs(rawLeft),abs(rawRight)))
+                        if(abs(rawLeft)>s.peakCeiling || abs(rawRight)>s.peakCeiling)peakLimitEvents++
+                        // Existing PCM16 ceiling remains unchanged; telemetry does not process audio.
+                        val leftPcm=WavIO.floatToS16(rawLeft.coerceIn(-s.peakCeiling,s.peakCeiling).toFloat())
+                        val rightPcm=WavIO.floatToS16(rawRight.coerceIn(-s.peakCeiling,s.peakCeiling).toFloat())
                         buf[cursor++]=(leftPcm and 255).toByte();buf[cursor++]=((leftPcm shr 8)and 255).toByte()
                         buf[cursor++]=(rightPcm and 255).toByte();buf[cursor++]=((rightPcm shr 8)and 255).toByte()
                     }
@@ -163,9 +172,19 @@ object NativeSubliminal {
                     }
                 }
             }
-            if(dest.exists())dest.delete()
-            require(tmp.renameTo(dest)){"Cannot finish WAV export"}
+            try {
+                Files.move(tmp.toPath(),dest.toPath(),StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING)
+            }catch(_:java.nio.file.AtomicMoveNotSupportedException){
+                Files.move(tmp.toPath(),dest.toPath(),StandardCopyOption.REPLACE_EXISTING)
+            }
+            Diagnostics.record("MIXER_LEVEL_AUDIT","Read-only original mix peak/ceiling check",
+                org.json.JSONObject().put("preCeilingPeak",observedPeak)
+                    .put("limitedFrames",peakLimitEvents)
+                    .put("ceiling",s.peakCeiling))
             Diagnostics.record("MIXER_COMPLETED","",org.json.JSONObject().put("elapsedMs",android.os.SystemClock.elapsedRealtime()-mixStarted).put("wavBytes",dest.length()))
-        } finally {sources.forEach{it?.close()}}
+        } finally {
+            File(dest.parentFile,dest.name+".partial").delete()
+            sources.forEach{it?.close()}
+        }
     }
 }
