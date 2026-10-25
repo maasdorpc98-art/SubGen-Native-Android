@@ -1,5 +1,6 @@
 package com.subgen.nativeapp
 
+import java.io.File
 import kotlin.math.max
 import kotlin.math.roundToLong
 
@@ -16,6 +17,24 @@ object WordPacing {
     const val DEFAULT = 100
 
     data class Plan(val extraFrames:LongArray, val totalAddedFrames:Long, val paddedBlocks:Int)
+
+    /** Insert pause nodes, leaving the original PCM16 and float32 WAV assembly untouched. */
+    fun augment(nodes:List<ScriptNode>, clips:List<File?>, rate:Int, targetWpm:Int?, frames:(File)->Long):Pair<List<ScriptNode>,List<File?>> {
+        require(nodes.size==clips.size)
+        if(targetWpm==null)return nodes to clips
+        val lengths=LongArray(nodes.size){i->if(nodes[i] is ScriptNode.Speech)frames(clips[i]?:error("Speech checkpoint missing")) else 0L}
+        val p=plan(nodes,lengths,rate,targetWpm)
+        val expandedNodes=ArrayList<ScriptNode>(nodes.size+p.paddedBlocks)
+        val expandedClips=ArrayList<File?>(clips.size+p.paddedBlocks)
+        for(i in nodes.indices){
+            expandedNodes+=nodes[i];expandedClips+=clips[i]
+            if(p.extraFrames[i]>0){
+                expandedNodes+=ScriptNode.Pause(p.extraFrames[i].toDouble()/rate)
+                expandedClips+=null
+            }
+        }
+        return expandedNodes to expandedClips
+    }
 
     fun plan(nodes:List<ScriptNode>, clipFrames:LongArray, rate:Int, targetWpm:Int?):Plan {
         require(nodes.size==clipFrames.size)
