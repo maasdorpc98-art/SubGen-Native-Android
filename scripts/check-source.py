@@ -8,7 +8,7 @@ assert len(files)>=7, len(files)
 text='\n'.join(x.read_text() for x in files)
 for forbidden in ['import android.webkit.', 'new WebView(', 'SpeechSynthesisUtterance(', 'window.AudioContext', '@JavascriptInterface']:
     assert forbidden not in text, f'Forbidden legacy engine: {forbidden}'
-for required in ['OfflineTts(', 'startForeground(', 'ModelInstaller(', 'WavIO.assemble(', 'StateStore.hash(', 'MediaStore.Downloads', 'NativeSubliminal.mix(', 'ACTION_INSTALL']:
+for required in ['OfflineTts(', 'startForeground(', 'ModelInstaller(', 'WavIO.assemble(', 'StateStore.hash(', 'MediaStore.Downloads', 'FourTrackSubliminal.mix(', 'ACTION_INSTALL']:
     assert required in text,required
 m=(p/'app/src/main/AndroidManifest.xml').read_text()
 assert 'FOREGROUND_SERVICE_DATA_SYNC' in m
