@@ -20,7 +20,7 @@ fun main(){
         File(base,"affirm-$index.wav").also{file->WavIO.writeMono(file,FloatArray(4800){g},24000)}
     }
     val four=File(base,"four-affirmation-mix.wav")
-    NativeSubliminal.mix(NativeSubliminal.Settings(
+    FourTrackSubliminal.mix(FourTrackSubliminal.Settings(
         carrierA=null,carrierB=null,affirmationA=tracks[0],affirmationB=tracks[3],
         durationSeconds=1,rate=32000,peakCeiling=1.0,
         affirmationMy=tracks[1],affirmationYou=tracks[2],myDb=0.0,youDb=0.0
@@ -33,7 +33,7 @@ fun main(){
     }
     check(kotlin.math.abs(output-.50)<.003){"Each enabled affirmation must be included exactly once, got $output"}
     val none=File(base,"disabled-affirmations.wav")
-    NativeSubliminal.mix(NativeSubliminal.Settings(null,null,tracks[0],null,1,32000,
+    FourTrackSubliminal.mix(FourTrackSubliminal.Settings(null,null,tracks[0],null,1,32000,
         affirmationMy=null,affirmationYou=null,primaryDb=0.0),none,{},{false})
     val only=java.io.RandomAccessFile(none,"r").use{r->
         r.seek(44+100L*4); val x=r.readUnsignedByte() or (r.readByte().toInt() shl 8);x.toShort().toInt()/32768.0
