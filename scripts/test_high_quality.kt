@@ -70,7 +70,7 @@ fun main(){
         test("Four optional independent tracks export clean 24-bit stereo without carrier"){
             val src=tone("four-source.wav",48000,seconds=.12,hz=620.0,amplitude=.1)
             val out=File(dir,"four-tracks24.wav")
-            val result=HighQualityMixer.mix(NativeSubliminal.Settings(
+            val result=HighQualityMixer.mix(FourTrackSubliminal.Settings(
                 null,null,src,src,1,48000,affirmationMy=src,affirmationYou=src,
                 myDb=0.0,youDb=0.0,peakCeiling=.9
             ),out,File(dir,"four-tracks-cache"),{}){false}
