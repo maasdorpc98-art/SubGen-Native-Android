@@ -8,12 +8,12 @@ android {
         minSdk = 29
         targetSdk = 34
         manifestPlaceholders["appLabel"] = "Subliminal Studio Native"
-        versionCode = 20
-        versionName = "3.2.6-hypnosis-wpm"
+        versionCode = 21
+        versionName = "3.2.7-four-affirmations"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     buildTypes {
-        debug { applicationIdSuffix = ".hypertest"; versionNameSuffix = "-test"; manifestPlaceholders["appLabel"] = "SubGen v3.2.6 Test" }
+        debug { applicationIdSuffix = ".hypertest"; versionNameSuffix = "-test"; manifestPlaceholders["appLabel"] = "SubGen v3.2.7 Test" }
         release { isMinifyEnabled = false }
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
