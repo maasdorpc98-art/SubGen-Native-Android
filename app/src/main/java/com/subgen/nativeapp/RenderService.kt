@@ -150,17 +150,35 @@ class RenderService:Service() {
         val lpfArray=intArrayOf(0,18000,16000,14000,12000,10000,8000,6000,4000,3000,2000)
         val hpf=hpfArray[level("ctrl-carrier-hpf",0f).toInt().coerceIn(0,10)]
         val lpf=lpfArray[level("ctrl-carrier-lpf",0f).toInt().coerceIn(0,10)]
+        // Every recorded affirmation is optional, with an independent volume, speed and loop.
+        fun active(key:String,oldSlot:Boolean=false):File? =
+            if(p.getBoolean("studio:enabled:$key",oldSlot))path(key)?.let{prepare(it)} else null
+        fun balanceDb(percent:Double):Double =
+            if(percent<=0.0)-60.0 else 20.0*kotlin.math.log10(percent/100.0)
+        val spokenVsFrequency=level("ctrl-master-balance-a",0f).coerceIn(-100.0,100.0)
+        val carrierVsAffirmations=level("ctrl-master-balance-b",0f).coerceIn(-100.0,100.0)
+        val spokenBalance=balanceDb(if(spokenVsFrequency>0)100-spokenVsFrequency else 100.0)
+        val freqBalance=balanceDb(if(spokenVsFrequency<0)100+spokenVsFrequency else 100.0)
+        val carrierBalance=balanceDb(if(carrierVsAffirmations>0)100-carrierVsAffirmations else 100.0)
+        val affirmationBalance=balanceDb(if(carrierVsAffirmations<0)100+carrierVsAffirmations else 100.0)
         val settings=NativeSubliminal.Settings(
             carrierA=path("carrierStandard")?.let{prepare(it)},
             carrierB=path("carrierStandard")?.let{prepare(it)},
-            affirmationA=path("affirmNormal")?.let{prepare(it)},
-            affirmationB=path("affirmFrequency")?.let{prepare(it)},
+            affirmationA=active("affirmNormal",true),
+            affirmationB=active("affirmFrequency",true),
             durationSeconds=duration,rate=rate,
             carrierDb=level("ctrl-vol-carrier",0f),carrier8dDb=level("ctrl-vol-carrier-8d",-60f),
             primaryDb=level("ctrl-vol1",0f),secondaryDb=level("ctrl-vol-noise",0f),
             layerDb=level("ctrl-na-layer-volume-1",0f),finalDb=level("ctrl-master-output-db",0f),
             primarySpeed=level("ctrl-na-layer-speed-1",1f),
-            secondarySpeed=if(enabled("ctrl-secondary-mod-on"))level("ctrl-secondary-speed",1f) else level("ctrl-na-layer-speed-1",1f),
+            secondarySpeed=level("ctrl-secondary-speed",1f),
+            affirmationMy=active("affirmMy"),affirmationYou=active("affirmYou"),
+            myDb=p.getFloat("studio:my:volume",-18f).toDouble(),
+            youDb=p.getFloat("studio:you:volume",-18f).toDouble(),
+            mySpeed=p.getFloat("studio:my:speed",1f).toDouble(),
+            youSpeed=p.getFloat("studio:you:speed",1f).toDouble(),
+            spokenBalanceDb=spokenBalance,frequencyBalanceDb=freqBalance,
+            carrierBalanceDb=carrierBalance,affirmationBalanceDb=affirmationBalance,
             stereoWidth=level("ctrl-carrier-width",100f)/100.0,
             fadeSeconds=level("ctrl-carrier-fade",0f),
             eightDPercent=level("ctrl-carrier-8d-speed",25f),
@@ -175,7 +193,10 @@ class RenderService:Service() {
             highPassHz=hpf.toDouble(),lowPassHz=lpf.toDouble()
         )
         Diagnostics.expectedOutput(duration.toLong()*rate*4L+44)
-        Diagnostics.stage("SUBLIMINAL_MIX",org.json.JSONObject().put("durationSeconds",duration).put("sampleRate",rate))
+        Diagnostics.stage("SUBLIMINAL_MIX",org.json.JSONObject().put("durationSeconds",duration).put("sampleRate",rate)
+            .put("carrierNormal",settings.carrierA!=null).put("carrier8d",settings.carrierB!=null)
+            .put("affirmI",settings.affirmationA!=null).put("affirmMy",settings.affirmationMy!=null)
+            .put("affirmYou",settings.affirmationYou!=null).put("affirmFrequency",settings.affirmationB!=null))
         StateStore.active(this,true)
         val result=File(filesDir,if(preview)"subliminal-preview.wav" else "subliminal-working.wav")
         if(hq){
