@@ -161,7 +161,7 @@ class RenderService:Service() {
         val freqBalance=balanceDb(if(spokenVsFrequency<0)100+spokenVsFrequency else 100.0)
         val carrierBalance=balanceDb(if(carrierVsAffirmations>0)100-carrierVsAffirmations else 100.0)
         val affirmationBalance=balanceDb(if(carrierVsAffirmations<0)100+carrierVsAffirmations else 100.0)
-        val settings=NativeSubliminal.Settings(
+        val settings=FourTrackSubliminal.Settings(
             carrierA=path("carrierStandard")?.let{prepare(it)},
             carrierB=path("carrierStandard")?.let{prepare(it)},
             affirmationA=active("affirmNormal",true),
@@ -202,7 +202,7 @@ class RenderService:Service() {
         if(hq){
             val measured=HighQualityMixer.mix(settings,result,File(cacheDir,"hq-studio-cache"),::update){cancelled.get()}
             Diagnostics.record("HQ_MIX_COMPLETE","PCM24; uniform peak protection",org.json.JSONObject().put("appliedGainDb",measured.appliedGainDb).put("sampleRate",measured.rate))
-        }else NativeSubliminal.mix(settings,result,::update){cancelled.get()}
+        }else FourTrackSubliminal.mix(settings,result,::update){cancelled.get()}
         Diagnostics.stage("SUBLIMINAL_WAV_COMPLETE")
         if(cancelled.get()){update("Subliminal render cancelled");return}
         if(preview){
