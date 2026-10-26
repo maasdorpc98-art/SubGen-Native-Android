@@ -229,9 +229,9 @@ class MainActivity : Activity() {
         return c
     }
     private fun buildStudio(){
-        statusCard("ENGINE","Ready","Dual-affirmation engine · Carrier Normal + 8D · optional Binaural + Rhythmic generators",green)
-        val loaded=listOf("carrierStandard","affirmNormal","affirmFrequency").count{p.getString(it,"")?.let{f->File(f).isFile}==true}
-        statusCard("INPUTS","$loaded / 3 loaded","Load Affirmation 1 and Affirmation 1 (A)",Color.rgb(231,164,82))
+        statusCard("ENGINE","Ready","Four optional affirmation tracks · Carrier Normal + 8D · optional Binaural + Rhythmic",green)
+        val loaded=listOf("carrierStandard","affirmNormal","affirmMy","affirmYou","affirmFrequency").count{p.getString(it,"")?.let{f->File(f).isFile}==true}
+        statusCard("INPUTS","$loaded / 5 loaded","Carrier and all four affirmations are optional · enable only desired sources",Color.rgb(231,164,82))
         val mins=p.getString("ctrl-duration","10")?.toIntOrNull()?:10
         val rate=p.getString("ctrl-samplerate","44100")?.toIntOrNull()?:44100
         statusCard("PROJECTED OUTPUT","$mins min · ${"%.1f".format(Locale.US,mins*60.0*rate*4/1e6)} MB","${"%,d".format(rate)} Hz · stereo 16-bit WAV",Color.rgb(243,101,119))
@@ -241,8 +241,10 @@ class MainActivity : Activity() {
         txt(upload,"✓ Local processing · audio stays on your device.",11f,green)
         space(upload,8)
         source(upload,"🌊 CARRIER","One uploaded audio file","Feeds Normal + 8D carrier functions",901,"carrierStandard")
-        source(upload,"🎙 PRIMARY · AFFIRMATION 1","Main affirmation recording","Primary · stationary voice",902,"affirmNormal")
-        source(upload,"🎙 SECONDARY · AFFIRMATION 1 (A)","Second affirmation recording","Secondary · stationary voice",903,"affirmFrequency")
+        studioOptionalSource(upload,"🎙 AFFIRMATION (I)",902,"affirmNormal",true)
+        studioOptionalSource(upload,"🎙 AFFIRMATION (MY)",904,"affirmMy",false)
+        studioOptionalSource(upload,"🎙 AFFIRMATION (YOU/YOUR)",905,"affirmYou",false)
+        studioOptionalSource(upload,"◌ AFFIRMATION FREQUENCY",903,"affirmFrequency",true)
         val presets=section(body,"02 — Presets")
         txt(presets,"DEEP INTEGRATION · ENCODE + INSTALL is the flagship understanding-first preset: natural-speed intelligible Primary speech stays dominant.",10f,cool)
         space(presets,10)
@@ -267,30 +269,23 @@ class MainActivity : Activity() {
         action(saved,"⬇ Backup All") {chooseExport(920,"mix-presets.json")}
         action(saved,"⬆ Import Backup") {chooseJson(921)}
         val mixer=section(body,"03 / MIXING DESK")
-        txt(mixer,"Three-source mixer + generated brainwave audio",17f,bright,true)
+        txt(mixer,"Carrier + four independent affirmation tracks",17f,bright,true)
         space(mixer,6)
-        txt(mixer,"One Carrier file feeds Normal and 8D. Primary and Secondary stay one layer each on the same base renderer.",10f,cool)
+        txt(mixer,"One Carrier file feeds Normal and 8D. I, My, You/Your and Frequency remain stationary and loop independently.",10f,cool)
         space(mixer,12)
-        val flow=subCard(mixer,"CARRIER  +  PRIMARY  +  SECONDARY","Optional Binaural Beat + Rhythmic Tone → Master",Color.rgb(49,84,86))
+        val flow=subCard(mixer,"CARRIER + I + MY + YOU/YOUR + FREQUENCY","Optional Binaural Beat + Rhythmic Tone → Master",Color.rgb(49,84,86))
         val carrier=subCard(mixer,"≈ Carrier","01 · One audio · Normal + 8D",Color.rgb(71,84,99))
         slider(carrier,"ctrl-vol-carrier")
         expandable(carrier,"▸ Carrier Functions · Normal + 8D ⌄",false){c->
             txt(c,"The same Carrier file can feed two functions: Normal is stationary, and only the 8D branch moves.",10f,cool)
             listOf("ctrl-vol-carrier-8d","ctrl-carrier-hpf","ctrl-carrier-lpf","ctrl-carrier-width","ctrl-carrier-fade","ctrl-carrier-8d-motion","ctrl-carrier-8d-speed").forEach{slider(c,it)}
         }
-        val primary=subCard(mixer,"◉ Primary · Affirmation 1","02 · Primary source volume · shared 1-layer path",Color.rgb(79,68,112))
-        slider(primary,"ctrl-vol1")
-        val secondary=subCard(mixer,"◉ Secondary · Affirmation 1 (A)","03 · Standard relationship + optional preset-authorized edits",Color.rgb(85,51,77))
-        slider(secondary,"ctrl-vol-noise")
-        slider(secondary,"ctrl-master-balance-a",master=true)
-        toggle(secondary,"ctrl-secondary-mod-on","Secondary Preset Modification")
-        expandable(secondary,"▸ Secondary Functions · Standard + Preset Permission",false){c->
-            txt(c,"Optional Secondary speed and tone edits require preset permission.",10f,cool)
-            slider(c,"ctrl-secondary-speed")
-            select(c,"ctrl-secondary-tone","SECONDARY TONE")
-        }
-        val balances=subCard(mixer,"Master balance","Carrier versus both affirmations together",Color.rgb(63,70,95))
+        val balances=subCard(mixer,"Group master balances","Spoken I/My/You versus Frequency · Carrier versus all affirmations",Color.rgb(63,70,95))
+        txt(balances,"GROUP 1 · SPOKEN (I + MY + YOU/YOUR) ↔ FREQUENCY",10f,cool)
+        slider(balances,"ctrl-master-balance-a",master=true)
+        txt(balances,"GROUP 2 · CARRIER ↔ ALL FOUR AFFIRMATIONS",10f,cool)
         slider(balances,"ctrl-master-balance-b",master=true)
+        txt(balances,"Both balances attenuate groups without rewriting individual track volumes.",10f,cool)
         val binaural=subCard(mixer,"🎧 Generated Brainwave Audio","Binaural Beat plus a separate Rhythmic Tone engine.",Color.rgb(55,81,102))
         toggle(binaural,"ctrl-binaural-on","Binaural Beat")
         expandable(binaural,"▸ Binaural Beat Controls 10.0 Hz · 400 Hz center",false){c->
@@ -316,13 +311,17 @@ class MainActivity : Activity() {
             select(c,"ctrl-normalize","PEAK CEILING")
             toggle(c,"ctrl-fixed-output-lift","Fixed Output Lift")
         }
-        txt(mixer,"Affirmations remain stationary and both start at the same time. Only the dedicated 8D Carrier copy moves left/right; generated tones are separate.",10f,cool)
+        txt(mixer,"The four enabled affirmations start together, each looping at its own speed. Only the 8D Carrier branch pans.",10f,cool)
         val layer=section(body,"04 — Shared Affirmation Layer")
-        val info=subCard(layer,"◌ ONE LAYER · BOTH AFFIRMATIONS","Primary · Affirmation 1 and Secondary · Affirmation 1 (A) are separate recordings.",Color.rgb(91,66,173))
-        txt(info,"Both sources always remain one layer each. They share base speed and shared layer volume.",11f,cool)
-        toggle(layer,"ctrl-affirmation-clarity-on","Affirmation Clarity")
+        val info=subCard(layer,"FOUR OPTIONAL · INDIVIDUAL TRACK CONTROLS","Each track has its own gain, playback speed and independent loop.",Color.rgb(91,66,173))
+        txt(info,"Volume −60 to 0 dB. Speed 0.10×–3.00× changes pitch and embedded modulation frequency. Keep Frequency at 1.00× if preserving an encoded 40 Hz modulation.",11f,cool)
+        studioTrackControls(layer,"AFFIRMATION (I)","affirmNormal",true,"ctrl-vol1","ctrl-na-layer-speed-1")
+        studioTrackControls(layer,"AFFIRMATION (MY)","affirmMy",false)
+        studioTrackControls(layer,"AFFIRMATION (YOU/YOUR)","affirmYou",false)
+        studioTrackControls(layer,"AFFIRMATION FREQUENCY","affirmFrequency",true,"ctrl-vol-noise","ctrl-secondary-speed")
+        toggle(layer,"ctrl-affirmation-clarity-on","Affirmation Clarity · optional legacy processing")
         expandable(layer,"Shared affirmation layer",false){c->
-            slider(c,"ctrl-na-layer-speed-1")
+            txt(c,"Optional shared attenuation trim across all four tracks. Individual speeds remain separate.",10f,cool)
             slider(c,"ctrl-na-layer-volume-1")
         }
         val render=section(body,"05 — Render Installation")
@@ -366,6 +365,48 @@ class MainActivity : Activity() {
             chooseAudio(code)
         }
     }
+    private fun studioOptionalSource(parent:LinearLayout,title:String,code:Int,key:String,legacy:Boolean){
+        val holder=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
+        parent.addView(holder,params())
+        source(holder,title,"Optional · stationary loop","Independent control is available at the bottom of the mixing desk",code,key)
+        val enabled=CheckBox(this).apply{
+            setTextColor(cool);textSize=11f
+            isChecked=p.getBoolean("studio:enabled:$key",legacy)
+            bindOnOffLabel("ENABLE $title"){on->
+                p.edit().putBoolean("studio:enabled:$key",on).putString("presetLabel","Custom").apply()
+            }
+        }
+        holder.addView(enabled,params(d(44)))
+        action(holder,"✕ CLEAR TRACK FILE"){
+            if(StateStore.active(this)){Toast.makeText(this,"Finish rendering before clearing audio",Toast.LENGTH_LONG).show();return@action}
+            p.edit().remove(key).putBoolean("studio:enabled:$key",false).apply()
+            showTab("studio")
+        }
+    }
+    private fun studioExtraSlider(parent:LinearLayout,track:String,kind:String){
+        val isSpeed=kind=="speed"
+        val id="studio:$track:$kind"
+        val def=if(isSpeed)1.0 else -18.0
+        val spec=OriginalSliderSpec(id,if(isSpeed)"Playback Speed 1.00×" else "Individual Volume −18.0 dB",
+            if(isSpeed)0.1 else -60.0,if(isSpeed)3.0 else 0.0,if(isSpeed)0.05 else 0.5,def,
+            if(isSpeed)"Changes playback pitch and any frequency modulation; 1.00× preserves the supplied recording."
+            else "Independent trim; 0 dB maximum, no automatic gain increase.")
+        val slider=OriginalStudioSliderView(this,spec).apply{
+            value=p.getFloat(id,def.toFloat()).toDouble()
+            onUserValueChanged={n->
+                p.edit().putFloat(id,n.toFloat()).putString("presetLabel","Custom").apply()
+            }
+        }
+        parent.addView(slider,params(d(82)).apply{bottomMargin=d(6)})
+    }
+    private fun studioTrackControls(parent:LinearLayout,title:String,key:String,legacy:Boolean,volumeId:String?=null,speedId:String?=null){
+        val card=subCard(parent,title,"Optional stationary source · independent loop",Color.rgb(78,62,115))
+        txt(card,"VOLUME",10f,cool,monoFont=true)
+        if(volumeId!=null)slider(card,volumeId) else studioExtraSlider(card,if(key=="affirmMy")"my" else "you","volume")
+        txt(card,"PLAYBACK SPEED",10f,cool,monoFont=true)
+        if(speedId!=null)slider(card,speedId) else studioExtraSlider(card,if(key=="affirmMy")"my" else "you","speed")
+        txt(card,"Disable above in Upload Tracks to omit this recording entirely.",10f,cool)
+    }
     private fun qualityToggle(parent:LinearLayout,key:String,description:String){
         val control=CheckBox(this).apply{
             setTextColor(green);textSize=12f
@@ -408,7 +449,7 @@ class MainActivity : Activity() {
             onUserValueChanged={n->
                 Diagnostics.interaction("slider:$id")
                 p.edit().putFloat("slider:$id",n.toFloat()).putString("presetLabel","Custom").apply()
-                if(id=="ctrl-master-balance-a"||id=="ctrl-master-balance-b")linkBalances()
+                // Group master gain is calculated only at mix time, preserving each track trim.
             }
         }
         slides[id]=v
@@ -484,7 +525,10 @@ class MainActivity : Activity() {
     }
     private fun renderStudio(preview:Boolean){
         Diagnostics.stage(if(preview)"PREVIEW_REQUESTED" else "STUDIO_RENDER_REQUESTED")
-        if(listOf("carrierStandard","affirmNormal","affirmFrequency").none {p.getString(it,"")?.let{f->File(f).isFile}==true}){
+        if(listOf("carrierStandard","affirmNormal","affirmMy","affirmYou","affirmFrequency").none{key->
+                val present=p.getString(key,"")?.let{f->File(f).isFile}==true
+                present && (key=="carrierStandard" || p.getBoolean("studio:enabled:$key",key=="affirmNormal"||key=="affirmFrequency"))
+            }){
             Toast.makeText(this,"Please load a source recording first",Toast.LENGTH_LONG).show();return
         }
         p.edit().putBoolean("subPreview",preview).apply();startAction(RenderService.ACTION_SUBLIMINAL)
@@ -1213,7 +1257,7 @@ class MainActivity : Activity() {
                 922->{val report=JSONObject().apply{
                     put("source","Subliminal Studio Native · v8.0.32 controls")
                     put("status",StateStore.status(this@MainActivity))
-                    val sources=JSONObject();for(k in listOf("carrierStandard","affirmNormal","affirmFrequency"))sources.put(k,p.getString(k,"")?.let{path->File(path).name}?:"")
+                    val sources=JSONObject();for(k in listOf("carrierStandard","affirmNormal","affirmMy","affirmYou","affirmFrequency"))sources.put(k,p.getString(k,"")?.let{path->File(path).name}?:"")
                     put("sources",sources)
                     val control=JSONObject();for(slider in OriginalStudioControlSpec.sliders)control.put(slider.id,p.getFloat("slider:${slider.id}",slider.initial.toFloat()).toDouble())
                     put("sliders",control)
