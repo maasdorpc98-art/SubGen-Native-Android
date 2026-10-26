@@ -8,7 +8,7 @@ import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 import kotlin.math.*
 
-/** Disk-backed PCM16 stereo mixer, three uploaded source files, independent 8D carrier branch.
+/** Disk-backed PCM16 stereo mixer, four optional affirmation files, independent 8D carrier branch.
  * UI is native and renders a separate 8D feed from the same uploaded Carrier file.
  * No WebAudio, HTML, WebView or arbitrary generated placeholders.
  */
@@ -74,13 +74,18 @@ object NativeSubliminal {
         val rhythmicOn:Boolean=false,val rhythmicDb:Double=0.0,val rhythmicPulse:Double=6.0,
         val rhythmicTone:Double=400.0,val rhythmicDepth:Double=1.0,val rhythmicSine:Boolean=false,
         val clarity:Boolean=false,val peakCeiling:Double=.912,
-        val highPassHz:Double=0.0,val lowPassHz:Double=0.0
+        val highPassHz:Double=0.0,val lowPassHz:Double=0.0,
+        val affirmationMy:File?=null,val affirmationYou:File?=null,
+        val myDb:Double=-18.0,val youDb:Double=-18.0,
+        val mySpeed:Double=1.0,val youSpeed:Double=1.0,
+        val spokenBalanceDb:Double=0.0,val frequencyBalanceDb:Double=0.0,
+        val carrierBalanceDb:Double=0.0,val affirmationBalanceDb:Double=0.0
     )
     private const val TAU=2*Math.PI
     fun mix(s:Settings,dest:File,update:(String)->Unit,stop:()->Boolean){
         val mixStarted=android.os.SystemClock.elapsedRealtime()
         Diagnostics.stage("MIXER_OPEN_SOURCES")
-        val files=listOf(s.carrierA,s.carrierB,s.affirmationA,s.affirmationB)
+        val files=listOf(s.carrierA,s.carrierB,s.affirmationA,s.affirmationB,s.affirmationMy,s.affirmationYou)
         require(files.any{it!=null}){"Select at least one Carrier or Affirmation audio file"}
         val sources=files.map{it?.let(::Source)}
         try {
@@ -90,10 +95,12 @@ object NativeSubliminal {
             Diagnostics.expectedOutput(frames*4L+44L)
             require(frames*4L<0xFFFFFFFFL){"WAV exceeds RIFF size limit"}
             fun gain(db:Double)=10.0.pow(db.coerceIn(-60.0,0.0)/20.0)
-            val g0=gain(s.carrierDb)
-            val g1=gain(s.carrier8dDb)
-            val g2=gain(s.primaryDb+s.layerDb)
-            val g3=gain(s.secondaryDb+s.layerDb)
+            val g0=gain(s.carrierDb+s.carrierBalanceDb)
+            val g1=gain(s.carrier8dDb+s.carrierBalanceDb)
+            val g2=gain(s.primaryDb+s.layerDb+s.spokenBalanceDb+s.affirmationBalanceDb)
+            val g3=gain(s.secondaryDb+s.layerDb+s.frequencyBalanceDb+s.affirmationBalanceDb)
+            val g4=gain(s.myDb+s.layerDb+s.spokenBalanceDb+s.affirmationBalanceDb)
+            val g5=gain(s.youDb+s.layerDb+s.spokenBalanceDb+s.affirmationBalanceDb)
             val final=gain(s.finalDb)
             val fade=s.fadeSeconds.coerceIn(0.0,30.0)
             val panHz=.004+s.eightDPercent.coerceIn(0.0,100.0)*.0008
@@ -105,8 +112,11 @@ object NativeSubliminal {
             val hpfAlpha=if(s.highPassHz>0)exp(-TAU*s.highPassHz/sr) else 0.0
             val low=DoubleArray(2);val highPrev=DoubleArray(2);val prevX=DoubleArray(2)
             val clarityStateA=DoubleArray(2);val clarityStateB=DoubleArray(2)
+            val clarityStateMy=DoubleArray(2);val clarityStateYou=DoubleArray(2)
             val clarityA=if(s.clarity && s.primarySpeed>1)1.0-exp(-TAU*(sr*.42/s.primarySpeed)/sr) else 1.0
             val clarityB=if(s.clarity && s.secondarySpeed>1)1.0-exp(-TAU*(sr*.42/s.secondarySpeed)/sr) else 1.0
+            val clarityMy=if(s.clarity && s.mySpeed>1)1.0-exp(-TAU*(sr*.42/s.mySpeed)/sr) else 1.0
+            val clarityYou=if(s.clarity && s.youSpeed>1)1.0-exp(-TAU*(sr*.42/s.youSpeed)/sr) else 1.0
             val chunkFrames=4096
             val buf=ByteArray(chunkFrames*4)
             val tmp=File(dest.parentFile,dest.name+".partial")
@@ -142,13 +152,19 @@ object NativeSubliminal {
                         var speechBR=b?.at(frameIndex,1,sr,s.secondarySpeed)?.toDouble()?:0.0
                         if(clarityA<1.0){clarityStateA[0]+=clarityA*(speechAL-clarityStateA[0]);clarityStateA[1]+=clarityA*(speechAR-clarityStateA[1]);speechAL=clarityStateA[0];speechAR=clarityStateA[1]}
                         if(clarityB<1.0){clarityStateB[0]+=clarityB*(speechBL-clarityStateB[0]);clarityStateB[1]+=clarityB*(speechBR-clarityStateB[1]);speechBL=clarityStateB[0];speechBR=clarityStateB[1]}
+                        var myL=sources[4]?.at(frameIndex,0,sr,s.mySpeed)?.toDouble()?:0.0
+                        var myR=sources[4]?.at(frameIndex,1,sr,s.mySpeed)?.toDouble()?:0.0
+                        var youL=sources[5]?.at(frameIndex,0,sr,s.youSpeed)?.toDouble()?:0.0
+                        var youR=sources[5]?.at(frameIndex,1,sr,s.youSpeed)?.toDouble()?:0.0
+                        if(clarityMy<1.0){clarityStateMy[0]+=clarityMy*(myL-clarityStateMy[0]);clarityStateMy[1]+=clarityMy*(myR-clarityStateMy[1]);myL=clarityStateMy[0];myR=clarityStateMy[1]}
+                        if(clarityYou<1.0){clarityStateYou[0]+=clarityYou*(youL-clarityStateYou[0]);clarityStateYou[1]+=clarityYou*(youR-clarityStateYou[1]);youL=clarityStateYou[0];youR=clarityStateYou[1]}
                         val binauralLeft=if(s.binauralOn)sin(TAU*binsLeft*t)*gain(s.binauralDb)*.2 else 0.0
                         val binauralRight=if(s.binauralOn)sin(TAU*binsRight*t)*gain(s.binauralDb)*.2 else 0.0
                         val pulse=if(s.rhythmicSine).5+.5*sin(TAU*s.rhythmicPulse*t) else if(sin(TAU*s.rhythmicPulse*t)>=0)1.0 else 0.0
                         val rhythm=if(s.rhythmicOn)sin(TAU*s.rhythmicTone*t)*(1-rhythmicShapeDepth+rhythmicShapeDepth*pulse)*gain(s.rhythmicDb)*.2 else 0.0
                         // Keep audio sources stationary: only the Carrier's separate 8D branch pans.
-                        val left=(cL*g0+c8L*g1)*fadeGain + speechAL*g2+speechBL*g3+binauralLeft+rhythm
-                        val right=(cR*g0+c8R*g1)*fadeGain + speechAR*g2+speechBR*g3+binauralRight+rhythm
+                        val left=(cL*g0+c8L*g1)*fadeGain + speechAL*g2+speechBL*g3+myL*g4+youL*g5+binauralLeft+rhythm
+                        val right=(cR*g0+c8R*g1)*fadeGain + speechAR*g2+speechBR*g3+myR*g4+youR*g5+binauralRight+rhythm
                         val leftPcm=WavIO.floatToS16((left*final).coerceIn(-s.peakCeiling,s.peakCeiling).toFloat())
                         val rightPcm=WavIO.floatToS16((right*final).coerceIn(-s.peakCeiling,s.peakCeiling).toFloat())
                         buf[cursor++]=(leftPcm and 255).toByte();buf[cursor++]=((leftPcm shr 8)and 255).toByte()
