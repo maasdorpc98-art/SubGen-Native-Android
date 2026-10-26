@@ -66,6 +66,7 @@ class MainActivity : Activity() {
     private var neuroLastRefreshToken=""
     private lateinit var status:TextView
     private var activeTab="studio"
+    @Volatile private var studioImporting=false
     private var applyingPreset=false
     private var selectedPreset="custom"
     private var refreshHyp: (() -> Unit)?=null
@@ -514,17 +515,32 @@ class MainActivity : Activity() {
     }
     private fun saveNamedPreset(){val name=p.getString("namedPreset","")?.trim().orEmpty();if(name.isBlank()){Toast.makeText(this,"Name your preset first",Toast.LENGTH_LONG).show();return}
         val obj=JSONObject();for(slider in OriginalStudioControlSpec.sliders)obj.put(slider.id,p.getFloat("slider:${slider.id}",slider.initial.toFloat()).toDouble())
+        for(track in listOf("my","you"))for(kind in listOf("volume","speed")){
+            val key="studio:$track:$kind"
+            obj.put(key,p.getFloat(key,if(kind=="speed")1f else -18f).toDouble())
+        }
+        for(key in listOf("affirmNormal","affirmMy","affirmYou","affirmFrequency"))
+            obj.put("enabled:$key",p.getBoolean("studio:enabled:$key",key=="affirmNormal"||key=="affirmFrequency"))
         val all=JSONObject(p.getString("namedPresets","{}")?:"{}");all.put(name,obj);p.edit().putString("namedPresets",all.toString()).apply();Toast.makeText(this,"Saved $name",Toast.LENGTH_SHORT).show()
     }
     private fun loadNamedPreset(){val name=p.getString("namedPreset","")?.trim().orEmpty();val all=JSONObject(p.getString("namedPresets","{}")?:"{}")
         if(!all.has(name)){Toast.makeText(this,"No preset named $name",Toast.LENGTH_LONG).show();return}
-        val saved=all.getJSONObject(name);val e=p.edit();for(key in saved.keys())e.putFloat("slider:$key",saved.getDouble(key).toFloat());e.putString("presetLabel",name).apply();showTab("studio")
+        val saved=all.getJSONObject(name);val e=p.edit()
+        for(key in saved.keys()){
+            when{
+                key.startsWith("studio:") -> e.putFloat(key,saved.getDouble(key).toFloat())
+                key.startsWith("enabled:") -> e.putBoolean("studio:enabled:"+key.removePrefix("enabled:"),saved.getBoolean(key))
+                OriginalStudioControlSpec.sliders.any{it.id==key} -> e.putFloat("slider:$key",saved.getDouble(key).toFloat())
+            }
+        }
+        e.putString("presetLabel",name).apply();showTab("studio")
     }
     private fun deleteNamedPreset(){val name=p.getString("namedPreset","")?.trim().orEmpty();val all=JSONObject(p.getString("namedPresets","{}")?:"{}")
         all.remove(name);p.edit().putString("namedPresets",all.toString()).apply();Toast.makeText(this,"Deleted $name",Toast.LENGTH_SHORT).show()
     }
     private fun renderStudio(preview:Boolean){
         Diagnostics.stage(if(preview)"PREVIEW_REQUESTED" else "STUDIO_RENDER_REQUESTED")
+        if(studioImporting){Toast.makeText(this,"Wait until the audio file finishes importing",Toast.LENGTH_LONG).show();return}
         if(listOf("carrierStandard","affirmNormal","affirmMy","affirmYou","affirmFrequency").none{key->
                 val present=p.getString(key,"")?.let{f->File(f).isFile}==true
                 present && (key=="carrierStandard" || p.getBoolean("studio:enabled:$key",key=="affirmNormal"||key=="affirmFrequency"))
@@ -1265,12 +1281,32 @@ class MainActivity : Activity() {
                 };contentResolver.openOutputStream(uri,"wt")!!.bufferedWriter().use{it.write(report.toString(2))}}
                 921->{val json=contentResolver.openInputStream(uri)!!.bufferedReader().use{JSONObject(it.readText())};p.edit().putString("namedPresets",json.toString()).apply()}
                 else->{val key=imported[requestCode]?:return
-                    val dest=File(filesDir,"source-$key.wav");val temp=File(filesDir,"source-$key.tmp")
-                    contentResolver.openInputStream(uri)!!.use{src->temp.outputStream().use{src.copyTo(it)}}
-                    if(dest.exists())dest.delete();require(temp.renameTo(dest)){"Cannot store source file"}
-                    val e=p.edit().putString(key,dest.absolutePath)
-                    if(key=="carrierStandard")e.putString("carrier8d",dest.absolutePath)
-                    e.apply();sourceLabels[key]?.text="${dest.name} · ${dest.length()/1024} KB"
+                    if(StateStore.active(this))error("Finish render before replacing source")
+                    if(studioImporting)error("Another audio import is already running")
+                    studioImporting=true
+                    val importedUri=uri
+                    Thread({
+                        val temp=File(filesDir,"source-$key.tmp")
+                        runCatching{
+                            val dest=File(filesDir,"source-$key.wav")
+                            contentResolver.openInputStream(importedUri)!!.use{src->
+                                temp.outputStream().buffered(131072).use{src.copyTo(it,131072)}
+                            }
+                            require(temp.length()>44){"Audio file is empty"}
+                            // Atomic-ish replacement of a private, decoded-on-demand source.
+                            if(dest.exists())require(dest.delete()){"Cannot replace source"}
+                            require(temp.renameTo(dest)){"Cannot store source"}
+                            val e=p.edit().putString(key,dest.absolutePath)
+                            if(key=="carrierStandard")e.putString("carrier8d",dest.absolutePath)
+                            else e.putBoolean("studio:enabled:$key",true)
+                            e.apply()
+                            Diagnostics.record("STUDIO_AUDIO_IMPORTED",extra=JSONObject().put("track",key).put("bytes",dest.length()))
+                        }.onFailure{Diagnostics.failure("STUDIO_AUDIO_IMPORT_FAILED",it);temp.delete()}
+                        runOnUiThread{
+                            studioImporting=false
+                            if(!isFinishing && activeTab=="studio")showTab("studio")
+                        }
+                    },"studio-audio-import").start()
                 }
             }
         }.onFailure{Diagnostics.failure("IMPORT_OR_EXPORT_FAILED",it);Toast.makeText(this,"Import failed: ${it.message}",Toast.LENGTH_LONG).show()}
