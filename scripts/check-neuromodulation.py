@@ -18,5 +18,5 @@ assert 'samples[i]=y' not in a  # no giant in-memory WAV buffer
 assert 'Digital roundtrip verification failed' in a and 'Master exceeds original' in a
 assert 'Version A' in a and 'Version B' in a
 assert 'isEnabled=true' in u and 'if(requireReady())' in u
-assert 'versionCode = 20' in (r/'app/build.gradle.kts').read_text()
+assert 'versionCode = 21' in (r/'app/build.gradle.kts').read_text()
 print('PASS: native third tab, protected master, verified A, mixer handoff, B/A+B functional, clearly gated exports, stable versionCode18')
