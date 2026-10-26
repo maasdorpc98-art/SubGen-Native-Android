@@ -33,16 +33,20 @@ object HighQualityMixer {
         require(s.rate in setOf(32000,44100,48000))
         require(s.durationSeconds in 1..5400)
         val rate=s.rate;val frames=s.durationSeconds.toLong()*rate
-        val files=listOf(s.carrierA,s.carrierB,s.affirmationA,s.affirmationB)
+        val files=listOf(s.carrierA,s.carrierB,s.affirmationA,s.affirmationB,s.affirmationMy,s.affirmationYou)
         require(files.any{it!=null}){"Select at least one audio source"}
         val preparedFiles=mutableMapOf<String,File>()
-        val converted=files.mapIndexed {i,file->file?.let{val speed=when(i){2->s.primarySpeed;3->s.secondarySpeed;else->1.0};preparedFiles.getOrPut("${it.canonicalPath}|$speed"){prepared(it,rate,speed,frames,cache,update,stop)}}}
+        val converted=files.mapIndexed {i,file->file?.let{val speed=when(i){2->s.primarySpeed;3->s.secondarySpeed;4->s.mySpeed;5->s.youSpeed;else->1.0};preparedFiles.getOrPut("${it.canonicalPath}|$speed"){prepared(it,rate,speed,frames,cache,update,stop)}}}
         val opened=linkedMapOf<String,HighQualityPcm.Reader>()
         val sources=try{converted.map{f->f?.let{opened.getOrPut(it.canonicalPath){HighQualityPcm.Reader(it)}}}}
             catch(t:Throwable){opened.values.forEach{it.close()};throw t}
         val floatMix=File(dest.parentFile,dest.name+".float.wav")
         fun gain(db:Double)=10.0.pow(db.coerceIn(-60.0,0.0)/20.0)
-        val g0=gain(s.carrierDb);val g1=gain(s.carrier8dDb);val g2=gain(s.primaryDb+s.layerDb);val g3=gain(s.secondaryDb+s.layerDb)
+        val g0=gain(s.carrierDb+s.carrierBalanceDb);val g1=gain(s.carrier8dDb+s.carrierBalanceDb)
+        val g2=gain(s.primaryDb+s.layerDb+s.spokenBalanceDb+s.affirmationBalanceDb)
+        val g3=gain(s.secondaryDb+s.layerDb+s.frequencyBalanceDb+s.affirmationBalanceDb)
+        val g4=gain(s.myDb+s.layerDb+s.spokenBalanceDb+s.affirmationBalanceDb)
+        val g5=gain(s.youDb+s.layerDb+s.spokenBalanceDb+s.affirmationBalanceDb)
         val final=gain(s.finalDb);val fade=s.fadeSeconds.coerceIn(0.0,30.0);val width=s.stereoWidth.coerceIn(0.0,2.0)
         val pan=Oscillator(.004+s.eightDPercent.coerceIn(0.0,100.0)*.0008,rate)
         val binL=Oscillator(s.centerHz-s.beatHz/2,rate);val binR=Oscillator(s.centerHz+s.beatHz/2,rate)
@@ -53,7 +57,9 @@ object HighQualityMixer {
         val low=DoubleArray(2);val prev=DoubleArray(2);val high=DoubleArray(2)
         val clarityA=if(s.clarity&&s.primarySpeed>1)1-exp(-TAU*.42/s.primarySpeed)else 1.0
         val clarityB=if(s.clarity&&s.secondarySpeed>1)1-exp(-TAU*.42/s.secondarySpeed)else 1.0
-        val clearA=DoubleArray(2);val clearB=DoubleArray(2)
+        val clarityMy=if(s.clarity&&s.mySpeed>1)1-exp(-TAU*.42/s.mySpeed)else 1.0
+        val clarityYou=if(s.clarity&&s.youSpeed>1)1-exp(-TAU*.42/s.youSpeed)else 1.0
+        val clearA=DoubleArray(2);val clearB=DoubleArray(2);val clearMy=DoubleArray(2);val clearYou=DoubleArray(2)
         fun at(source:HighQualityPcm.Reader?,f:Long,ch:Int)=source?.let{it.at(f%it.info.frames,ch)}?:0.0
         try{
             HighQualityPcm.requireSpace(dest.absoluteFile.parentFile,frames*14L)
@@ -76,8 +82,11 @@ object HighQualityMixer {
                         var a=at(sources[2],i,ch);var b=at(sources[3],i,ch)
                         if(clarityA<1){clearA[ch]+=clarityA*(a-clearA[ch]);a=clearA[ch]}
                         if(clarityB<1){clearB[ch]+=clarityB*(b-clearB[ch]);b=clearB[ch]}
+                        var my=at(sources[4],i,ch);var you=at(sources[5],i,ch)
+                        if(clarityMy<1){clearMy[ch]+=clarityMy*(my-clearMy[ch]);my=clearMy[ch]}
+                        if(clarityYou<1){clearYou[ch]+=clarityYou*(you-clearYou[ch]);you=clearYou[ch]}
                         val carrier=if(ch==0)left else right;val eight=if(ch==0)eightL else eightR;val binaural=if(ch==0)bl else br
-                        w.put(((carrier*g0+eight*g1)*fadeGain+a*g2+b*g3+binaural+rhythmic)*final)
+                        w.put(((carrier*g0+eight*g1)*fadeGain+a*g2+b*g3+my*g4+you*g5+binaural+rhythmic)*final)
                     }
                 };w.finish()
             }
