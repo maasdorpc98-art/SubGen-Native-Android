@@ -120,7 +120,8 @@ object NativeSubliminal {
             val chunkFrames=4096
             val buf=ByteArray(chunkFrames*4)
             val tmp=File(dest.parentFile,dest.name+".partial")
-            FileOutputStream(tmp).buffered(65536).use{out->
+            var ceilingTouched=0L
+            try{FileOutputStream(tmp).buffered(65536).use{out->
                 WavIO.writeHeader(out,frames,sr,2)
                 var frame=0L
                 while(frame<frames){
@@ -165,6 +166,7 @@ object NativeSubliminal {
                         // Keep audio sources stationary: only the Carrier's separate 8D branch pans.
                         val left=(cL*g0+c8L*g1)*fadeGain + speechAL*g2+speechBL*g3+myL*g4+youL*g5+binauralLeft+rhythm
                         val right=(cR*g0+c8R*g1)*fadeGain + speechAR*g2+speechBR*g3+myR*g4+youR*g5+binauralRight+rhythm
+                        if(abs(left*final)>s.peakCeiling || abs(right*final)>s.peakCeiling)ceilingTouched++
                         val leftPcm=WavIO.floatToS16((left*final).coerceIn(-s.peakCeiling,s.peakCeiling).toFloat())
                         val rightPcm=WavIO.floatToS16((right*final).coerceIn(-s.peakCeiling,s.peakCeiling).toFloat())
                         buf[cursor++]=(leftPcm and 255).toByte();buf[cursor++]=((leftPcm shr 8)and 255).toByte()
@@ -179,8 +181,12 @@ object NativeSubliminal {
                     }
                 }
             }
-            if(dest.exists())dest.delete()
+            }catch(t:Throwable){tmp.delete();throw t}
+            // Linux/Android rename atomically replaces the old completed WAV when successful.
+            // Never delete an earlier completed master before the new one is ready.
             require(tmp.renameTo(dest)){"Cannot finish WAV export"}
+            if(ceilingTouched>0L)Diagnostics.record("MIXER_PEAK_CEILING_REACHED","",org.json.JSONObject()
+                .put("limitedFrames",ceilingTouched).put("totalFrames",frames))
             Diagnostics.record("MIXER_COMPLETED","",org.json.JSONObject().put("elapsedMs",android.os.SystemClock.elapsedRealtime()-mixStarted).put("wavBytes",dest.length()))
         } finally {sources.forEach{it?.close()}}
     }
