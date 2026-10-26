@@ -67,6 +67,19 @@ fun main(){
                 for(i in 0 until r.info.frames){val x=r.at(i,0);peak=max(peak,abs(x));sum+=x*x}
                 check(peak<=.5000001);check(abs(sqrt(sum/r.info.frames)-.5/sqrt(2.0))<.001)}
         }
+        test("Four optional independent tracks export clean 24-bit stereo without carrier"){
+            val src=tone("four-source.wav",48000,seconds=.12,hz=620.0,amplitude=.1)
+            val out=File(dir,"four-tracks24.wav")
+            val result=HighQualityMixer.mix(NativeSubliminal.Settings(
+                null,null,src,src,1,48000,affirmationMy=src,affirmationYou=src,
+                myDb=0.0,youDb=0.0,peakCeiling=.9
+            ),out,File(dir,"four-tracks-cache"),{}){false}
+            check(result.rate==48000&&result.channels==2)
+            HighQualityPcm.Reader(out).use{r->
+                check(r.info.bits==24&&r.info.frames==48000L)
+                check(abs(r.at(1000,0))>1e-3)
+            }
+        }
         test("Prepared sources are reused for a shorter export; damaged cache is regenerated"){
             val input=File(dir,"mix-input.wav");val cache=File(dir,"mix-cache")
             val saved=cache.listFiles()!!.filter{it.extension=="wav"}.associateWith{HighQualityPcm.sha(it)}
