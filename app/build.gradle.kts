@@ -4,7 +4,7 @@ android {
     namespace = "com.subgen.nativeapp"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.subgen.nativeapp.stable"
+        applicationId = "com.subgen.nativeapp.fouraffirmations.v327"
         minSdk = 29
         targetSdk = 34
         manifestPlaceholders["appLabel"] = "Subliminal Studio Native"
