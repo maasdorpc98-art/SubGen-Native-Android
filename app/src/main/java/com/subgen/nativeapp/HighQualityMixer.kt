@@ -29,7 +29,43 @@ object HighQualityMixer {
         checksum.writeText(HighQualityPcm.sha(target))
         return target
     }
-    fun mix(s:NativeSubliminal.Settings,dest:File,cache:File,update:(String)->Unit,stop:()->Boolean):HighQualityPcm.Result {
+    /** Legacy entry point: original Settings retains its stable, protected API. */
+    fun mix(s:NativeSubliminal.Settings,dest:File,cache:File,update:(String)->Unit,stop:()->Boolean):HighQualityPcm.Result =
+        mix(FourTrackSubliminal.Settings(
+            carrierA=s.carrierA,
+            carrierB=s.carrierB,
+            affirmationA=s.affirmationA,
+            affirmationB=s.affirmationB,
+            durationSeconds=s.durationSeconds,
+            rate=s.rate,
+            carrierDb=s.carrierDb,
+            carrier8dDb=s.carrier8dDb,
+            primaryDb=s.primaryDb,
+            secondaryDb=s.secondaryDb,
+            layerDb=s.layerDb,
+            finalDb=s.finalDb,
+            primarySpeed=s.primarySpeed,
+            secondarySpeed=s.secondarySpeed,
+            stereoWidth=s.stereoWidth,
+            fadeSeconds=s.fadeSeconds,
+            eightDPercent=s.eightDPercent,
+            binauralOn=s.binauralOn,
+            binauralDb=s.binauralDb,
+            beatHz=s.beatHz,
+            centerHz=s.centerHz,
+            rhythmicOn=s.rhythmicOn,
+            rhythmicDb=s.rhythmicDb,
+            rhythmicPulse=s.rhythmicPulse,
+            rhythmicTone=s.rhythmicTone,
+            rhythmicDepth=s.rhythmicDepth,
+            rhythmicSine=s.rhythmicSine,
+            clarity=s.clarity,
+            peakCeiling=s.peakCeiling,
+            highPassHz=s.highPassHz,
+            lowPassHz=s.lowPassHz
+        ),dest,cache,update,stop)
+
+    fun mix(s:FourTrackSubliminal.Settings,dest:File,cache:File,update:(String)->Unit,stop:()->Boolean):HighQualityPcm.Result {
         require(s.rate in setOf(32000,44100,48000))
         require(s.durationSeconds in 1..5400)
         val rate=s.rate;val frames=s.durationSeconds.toLong()*rate
