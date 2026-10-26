@@ -1296,6 +1296,8 @@ class MainActivity : Activity() {
                             // Atomic-ish replacement of a private, decoded-on-demand source.
                             if(dest.exists())require(dest.delete()){"Cannot replace source"}
                             require(temp.renameTo(dest)){"Cannot store source"}
+                            // Force re-decoding of replacement MP3/M4A/FLAC even when file times match.
+                            File(filesDir,"source-$key.wav.decoded.wav").delete()
                             val e=p.edit().putString(key,dest.absolutePath)
                             if(key=="carrierStandard")e.putString("carrier8d",dest.absolutePath)
                             else e.putBoolean("studio:enabled:$key",true)
