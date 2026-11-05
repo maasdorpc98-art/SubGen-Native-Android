@@ -186,9 +186,9 @@ class MainActivity : Activity() {
             val v=TextView(this).apply{text=label;gravity=Gravity.CENTER;textSize=10f;typeface=mono;letterSpacing=.17f;setTextColor(cool);setPadding(d(6),d(14),d(6),d(14))}
             tabs.addView(v,LinearLayout.LayoutParams(0,-2,1f));return v
         }
-        tabStudio=tab("⚙ STUDIO")
-        tabHypnosis=tab("🧠 HYPNOSIS")
-        tabNeuro=tab("≈ FREQUENCY")
+        tabStudio=tab("⚙  STUDIO")
+        tabHypnosis=tab("🧠 HYPNOSIS ENGINE")
+        tabNeuro=tab("≈ NEUROMOD")
         tabMorphic=tab("◇ MORPHIC")
         tabStudio.setOnClickListener{showTab("studio")}
         tabHypnosis.setOnClickListener{showTab("hypnosis")}
