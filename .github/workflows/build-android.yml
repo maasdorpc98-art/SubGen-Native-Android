@@ -2,7 +2,7 @@ name: Native Android APK
 on:
   workflow_dispatch:
   push:
-    branches: [subgen-v3.2.7-new-package-id, subgen-v3.2.7-four-affirmation-mixer, main, subgen-v3.0.1-diagnostic-apk, subgen-v3.0.2-stability, subgen-v3.0.3-jni-stability, subgen-v3.0.4-fp32-audio-stability, subgen-v3.0.5-speed-engine, subgen-v3.0.6-hypnosis-essential-controls, subgen-v3.0.7-adaptive-neural-speed, subgen-v3.0.8-voice-speed-updates, subgen-v3.1.1-script-acoustic-contract, subgen-v3.1.2-neuromodulation-a, subgen-v3.1.3-neuromodulation-full-ab, subgen-v3.2-hyper-production]
+    branches: [feature/subgen-v327-four-blocks-morphic, subgen-v3.2.7-new-package-id, subgen-v3.2.7-four-affirmation-mixer, main, subgen-v3.0.1-diagnostic-apk, subgen-v3.0.2-stability, subgen-v3.0.3-jni-stability, subgen-v3.0.4-fp32-audio-stability, subgen-v3.0.5-speed-engine, subgen-v3.0.6-hypnosis-essential-controls, subgen-v3.0.7-adaptive-neural-speed, subgen-v3.0.8-voice-speed-updates, subgen-v3.1.1-script-acoustic-contract, subgen-v3.1.2-neuromodulation-a, subgen-v3.1.3-neuromodulation-full-ab, subgen-v3.2-hyper-production]
   pull_request:
 jobs:
   android:
@@ -67,7 +67,7 @@ jobs:
           unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -q 'lib/arm64-v8a/libsherpa-onnx-jni.so'
           sha256sum app/build/outputs/apk/debug/app-debug.apk
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk > test-results/DEBUG-APK-IDENTITY.txt
-          grep -q "package: name='com.subgen.nativeapp.fouraffirmations.v327.hypertest'" test-results/DEBUG-APK-IDENTITY.txt
+          grep -q "package: name='com.subgen.nativeapp.fourblocks.preview.hypertest'" test-results/DEBUG-APK-IDENTITY.txt
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
