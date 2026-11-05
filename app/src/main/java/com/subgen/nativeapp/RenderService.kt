@@ -33,7 +33,7 @@ class RenderService:Service() {
             if(Build.VERSION.SDK_INT>=29)startForeground(ID,note,ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
             else startForeground(ID,note)
             executor.execute {
-                try {acquireWake();when(intent?.action){ACTION_INSTALL->installOnly();ACTION_SUBLIMINAL->runSubliminal();ACTION_BENCHMARK->benchmark();ACTION_PREVIEW->previewVoice();else->runJob()}}
+                try {acquireWake();when(intent?.action){ACTION_INSTALL->installOnly();ACTION_SUBLIMINAL->runSubliminal();ACTION_MORPHIC->runMorphic();ACTION_BENCHMARK->benchmark();ACTION_PREVIEW->previewVoice();else->runJob()}}
                 catch(t:Throwable){update("Stopped: ${t.message?:t.javaClass.simpleName}")}
                 finally {StateStore.active(this,false);releaseWake();busy.set(false);stopForeground(STOP_FOREGROUND_REMOVE);stopSelfResult(startId)}
             }
@@ -72,6 +72,32 @@ class RenderService:Service() {
         val best=results.minByOrNull{it.second}!!
         p.edit().putInt("threads",best.first).putString("benchmark",results.joinToString(" · "){"${it.first} threads RTF ${"%.2f".format(it.second)}"}).apply()
         update("BEST: ${best.first} threads · ${p.getString("benchmark","")}")
+    }
+    private fun runMorphic() {
+        val p=StateStore.prefs(this)
+        val affirmations=p.getString("morphicText","").orEmpty()
+        val minutes=p.getInt("morphicMinutes",5)
+        val name=p.getString("morphicName","Morphic Field")?:"Morphic Field"
+        val output=File(filesDir,"morphic-working.wav")
+        StateStore.active(this,true)
+        update("Encoding written affirmations to morphic waveform…")
+        val report=MorphicFieldEngine.render(affirmations,minutes,output,::update){cancelled.get()}
+        if(cancelled.get()) {
+            update("Morphic waveform render cancelled")
+            return
+        }
+        update("Verifying full written affirmation packet…")
+        require(MorphicFieldEngine.verifyText(output)==affirmations){
+            "Morphic waveform verification failed"
+        }
+        if(cancelled.get()) {
+            update("Cancelled before export")
+            return
+        }
+        update("Saving verified Morphic WAV to Downloads/SubGen…")
+        val uri=WavIO.saveToDownloads(this,output,name)
+        p.edit().putString("morphicLastUri",uri.toString()).apply()
+        update("SAVED · MORPHIC WAV · text verified · ${report.completeCycles} cycles · Downloads/SubGen")
     }
     private fun runSubliminal(){
         val p=StateStore.prefs(this)
@@ -158,5 +184,5 @@ class RenderService:Service() {
     private fun acquireWake(){wakeLock=(getSystemService(POWER_SERVICE) as PowerManager).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,"SubGen:HypnosisRender").apply{setReferenceCounted(false);acquire(5*60*60*1000L)}}
     private fun releaseWake(){if(wakeLock?.isHeld==true)wakeLock?.release();wakeLock=null}
     override fun onDestroy(){cancelled.set(true);releaseWake();executor.shutdown();super.onDestroy()}
-    companion object{const val ACTION_CANCEL="com.subgen.nativeapp.CANCEL";const val ACTION_INSTALL="com.subgen.nativeapp.INSTALL";const val ACTION_BENCHMARK="com.subgen.nativeapp.BENCHMARK";const val ACTION_PREVIEW="com.subgen.nativeapp.PREVIEW";const val ACTION_SUBLIMINAL="com.subgen.nativeapp.SUBLIMINAL";const val CHANNEL="subgen-hypnosis";const val ID=9021}
+    companion object{const val ACTION_CANCEL="com.subgen.nativeapp.CANCEL";const val ACTION_INSTALL="com.subgen.nativeapp.INSTALL";const val ACTION_BENCHMARK="com.subgen.nativeapp.BENCHMARK";const val ACTION_PREVIEW="com.subgen.nativeapp.PREVIEW";const val ACTION_SUBLIMINAL="com.subgen.nativeapp.SUBLIMINAL";const val ACTION_MORPHIC="com.subgen.nativeapp.MORPHIC";const val CHANNEL="subgen-hypnosis";const val ID=9021}
 }
