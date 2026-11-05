@@ -36,3 +36,7 @@ java -jar /tmp/subgen-neuro-b-test.jar
 # Words-per-minute pacing: OFF parity, real PCM duration and explicit-pause accounting.
 kotlinc "$K/ScriptParser.kt" "$K/WordPacing.kt" "$K/WavIO.kt" scripts/test_word_pacing.kt tests/stubs/*.kt -include-runtime -d /tmp/subgen-wpm-pacing.jar
 java -jar /tmp/subgen-wpm-pacing.jar
+
+# Fourth audio block: written text becomes a recoverable, content-sensitive waveform.
+kotlinc "$K/ScriptParser.kt" "$K/WordPacing.kt" "$K/WavIO.kt" "$K/MorphicFieldEngine.kt" scripts/test_morphic.kt tests/stubs/*.kt -include-runtime -d /tmp/subgen-morphic-test.jar
+java -jar /tmp/subgen-morphic-test.jar
