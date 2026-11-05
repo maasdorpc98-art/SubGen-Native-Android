@@ -572,45 +572,76 @@ class MainActivity : Activity() {
     }
 
     /** Experimental fourth generator; no changes to the original three engines. */
+    /** Fourth audio section: a self-contained written-intention waveform experiment. */
     private fun buildMorphic(){
         val intro=panel(body,fill=Color.rgb(24,18,27),border=Color.rgb(130,36,54),padding=18)
-        txt(intro,"MORPHIC FIELD GENERATOR",21f,coral,true,tracking=.11f,gravity=Gravity.CENTER)
-        txt(intro,"WRITTEN AFFIRMATIONS → DIGITAL WAVEFORM · OFFLINE",10f,cool,gravity=Gravity.CENTER)
-        txt(intro,"Encodes exact UTF-8 text into a repeatable WAV signal. Digital recovery verifies the encoding; energetic morphic-field effects remain unverified.",10f,cool)
-        val source=section(body,"01 — Written Affirmations")
-        val input=EditText(this).apply {
-            setText(p.getString("morphicText","")?:"")
-            setTextColor(bright);setHintTextColor(cool)
-            hint="Paste your written affirmations here, one per line"
-            textSize=14f;minLines=10;setSingleLine(false);gravity=Gravity.TOP
-            setPadding(d(12),d(12),d(12),d(12))
-            background=cardShape(Color.rgb(14,20,29),Color.rgb(79,63,90),10)
-            inputType=android.text.InputType.TYPE_CLASS_TEXT or
-                android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or
-                android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-        }
-        source.addView(input,params(d(245)))
-        input.addTextChangedListener(object:TextWatcher{
-            override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){}
-            override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){
-                p.edit().putString("morphicText",s?.toString()?:"").apply()
+        txt(intro,"MORPHIC FIELD LAB · V2",21f,coral,true,tracking=.11f,gravity=Gravity.CENTER)
+        txt(intro,"FIELD CONCEPT + WRITTEN AFFIRMATIONS → AUDIO",10f,cool,gravity=Gravity.CENTER)
+        space(intro,8)
+        txt(intro,"The complete written blueprint is encoded in the actual waveform, then decoded and SHA-256 verified. This is an experimental method, not proof of energetic field creation.",10f,cool)
+
+        fun field(parent:LinearLayout,title:String,key:String,hint:String,height:Int,single:Boolean=false):EditText{
+            txt(parent,title.uppercase(),10f,cool,monoFont=true)
+            space(parent,7)
+            val input=EditText(this).apply{
+                setText(p.getString(key,"")?:"")
+                setTextColor(bright);setHintTextColor(cool)
+                this.hint=hint;textSize=14f;setSingleLine(single)
+                gravity=if(single)Gravity.CENTER_VERTICAL else Gravity.TOP
+                setPadding(d(12),d(12),d(12),d(12))
+                background=cardShape(Color.rgb(14,20,29),Color.rgb(79,63,90),10)
+                if(!single)inputType=android.text.InputType.TYPE_CLASS_TEXT or
+                    android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+                    android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
             }
-            override fun afterTextChanged(s:Editable?){}
-        })
+            parent.addView(input,params(d(height)))
+            input.addTextChangedListener(object:TextWatcher{
+                override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){}
+                override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){
+                    p.edit().putString(key,s?.toString()?:"").apply()
+                }
+                override fun afterTextChanged(s:Editable?){}
+            })
+            space(parent,12)
+            return input
+        }
+
+        val design=section(body,"01 — Field Concept")
+        val objective=field(design,"Intended objective","morphicObjective",
+            "What is this field intended to support?",56,true)
+        val instructions=field(design,"Field instructions · optional","morphicInstructions",
+            "Describe the intended operation or conceptual design in your own words.",126)
+        txt(design,"These are specifications supplied by you, not AI-generated or verified nonphysical mechanisms.",10f,cool)
+
+        val source=section(body,"02 — Written Affirmations")
+        val affirmations=field(source,"Affirmations","morphicText",
+            "Paste written affirmations, one per line.",245)
         action(source,"▣ IMPORT WRITTEN AFFIRMATIONS · TXT"){
             val intent=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{
                 addCategory(Intent.CATEGORY_OPENABLE);type="text/plain"
             }
             @Suppress("DEPRECATION") startActivityForResult(intent,960)
         }
-        val settings=section(body,"02 — Generator Settings")
-        txt(settings,"EXACT UTF-8 ENCODING · 800/1600 Hz · 24 kHz · PCM16 MONO",10f,cool)
+        txt(source,"Every line and punctuation mark is retained as UTF-8 text inside the waveform.",10f,cool)
+
+        val settings=section(body,"03 — Sound & Duration")
+        txt(settings,"AUDIO PROFILE",10f,cool,monoFont=true)
+        val selectedProfile=p.getString("morphicProfile","ambient")?:"ambient"
+        action(settings,(if(selectedProfile=="ambient")"● " else "○ ")+"AMBIENT · STEREO SOUNDSCAPE"){
+            p.edit().putString("morphicProfile","ambient").apply();showTab("morphic")
+        }
+        txt(settings,"Soft original tonal layers under the data signal · 24 kHz stereo WAV.",10f,cool)
+        action(settings,(if(selectedProfile=="signal")"● " else "○ ")+"SIGNAL · PURE TEXT ENCODING"){
+            p.edit().putString("morphicProfile","signal").apply();showTab("morphic")
+        }
+        txt(settings,"Unmixed 800/1600 Hz frequency shift encoding · 24 kHz mono WAV.",10f,cool)
+        space(settings,12)
         val selected=p.getInt("morphicMinutes",5).coerceIn(1,60)
         txt(settings,"DURATION · $selected MINUTES",12f,bright,true)
         val timeRow=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
         settings.addView(timeRow,params())
         for(minutes in listOf(1,3,5,10,20,30,60)){
-            val v=TextView(this).apply{
+            val view=TextView(this).apply{
                 text=minutes.toString();textSize=10f;typeface=mono
                 gravity=Gravity.CENTER;setPadding(d(2),d(12),d(2),d(12))
                 background=cardShape(if(minutes==selected)Color.rgb(100,39,52) else surface2,
@@ -618,37 +649,68 @@ class MainActivity : Activity() {
                 setTextColor(if(minutes==selected)bright else cool)
                 setOnClickListener{p.edit().putInt("morphicMinutes",minutes).apply();showTab("morphic")}
             }
-            timeRow.addView(v,LinearLayout.LayoutParams(0,-2,1f).apply{marginEnd=d(3)})
+            timeRow.addView(view,LinearLayout.LayoutParams(0,-2,1f).apply{marginEnd=d(3)})
         }
-        txt(settings,"Longer texts require enough output time to encode one complete copy. The engine will explain if more time is needed.",10f,cool)
-        val export=section(body,"03 — Generate & Verify WAV")
-        txt(export,"OUTPUT FILE NAME",10f,cool,monoFont=true)
-        val name=EditText(this).apply{
-            setSingleLine(true);setText(p.getString("morphicName","Morphic Field")?:"Morphic Field")
-            setTextColor(bright);textSize=14f
-            setPadding(d(12),d(10),d(12),d(10))
-            background=cardShape(Color.rgb(14,20,29),Color.rgb(79,63,90),10)
+        val capacity=txt(settings,"One complete field blueprint must fit within the duration.",10f,cool)
+        fun currentBlueprint()=MorphicFieldV2.Blueprint(
+            objective.text.toString(),instructions.text.toString(),affirmations.text.toString())
+        fun showCapacity(){
+            capacity.text=runCatching {
+                val seconds=MorphicFieldV2.minimumSeconds(currentBlueprint())
+                val cycles=(selected*60)/seconds.coerceAtLeast(1)
+                "Required: $seconds seconds minimum · complete cycles within selected duration: $cycles"
+            }.getOrElse{"Enter affirmations to estimate required encoding time."}
         }
-        export.addView(name,params(d(45)))
-        name.addTextChangedListener(object:TextWatcher{
-            override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){}
-            override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){
-                p.edit().putString("morphicName",s?.toString()?:"").apply()
-            }
-            override fun afterTextChanged(s:Editable?){}
-        })
-        action(export,"GENERATE MORPHIC WAVEFORM WAV","primary"){
-            val text=input.text.toString()
-            if(text.isBlank()){
-                Toast.makeText(this,"Enter written affirmations first",Toast.LENGTH_LONG).show()
+        showCapacity()
+        action(settings,"AUTO-FIT DURATION"){
+            val seconds=runCatching{MorphicFieldV2.minimumSeconds(currentBlueprint())}
+                .getOrElse{Toast.makeText(this,it.message,Toast.LENGTH_LONG).show();return@action}
+            val fit=listOf(1,3,5,10,20,30,60).firstOrNull{it*60>=seconds}
+            if(fit==null){
+                Toast.makeText(this,"Too much text for a 60-minute field WAV",Toast.LENGTH_LONG).show()
                 return@action
             }
-            p.edit().putString("morphicText",text).putString("morphicName",name.text.toString()).apply()
+            p.edit().putInt("morphicMinutes",fit).apply();showTab("morphic")
+        }
+
+        val export=section(body,"04 — Render, Verify & Export")
+        val name=field(export,"Output filename","morphicName","Morphic Field",48,true)
+        if(name.text.isBlank())name.setText("Morphic Field")
+        action(export,"GENERATE & VERIFY FIELD WAV","primary"){
+            val blueprint=runCatching{currentBlueprint().validated()}.getOrElse{
+                Toast.makeText(this,it.message,Toast.LENGTH_LONG).show()
+                return@action
+            }
+            val seconds=MorphicFieldV2.minimumSeconds(blueprint)
+            if(seconds>selected*60){
+                Toast.makeText(this,"Select at least $seconds seconds, or use AUTO-FIT DURATION",Toast.LENGTH_LONG).show()
+                return@action
+            }
+            p.edit().putString("morphicObjective",blueprint.objective)
+                .putString("morphicInstructions",blueprint.instructions)
+                .putString("morphicText",blueprint.affirmations)
+                .putString("morphicName",name.text.toString()).apply()
             startAction(RenderService.ACTION_MORPHIC)
         }
         action(export,"STOP GENERATION"){startAction(RenderService.ACTION_CANCEL)}
-        morphicStatusText=txt(export,p.getString("morphic:status","Ready · written text waveform encoder")?:"Ready",11f,green)
-        txt(export,"After generation the text is decoded from the saved waveform and SHA-256 checked before export to Downloads/SubGen.",10f,cool)
+        morphicStatusText=txt(export,p.getString("morphic:status","Ready · written field blueprint encoder")?:"Ready",11f,green)
+        val hash=p.getString("morphicLastHash","").orEmpty()
+        if(hash.isNotBlank()){
+            txt(export,"LAST VERIFIED SHA-256 · $hash",9f,cool,monoFont=true)
+            txt(export,"LAST OUTPUT · ${p.getString("morphicLastProfile","")} · ${p.getLong("morphicLastCycles",0)} complete cycles",10f,cool)
+            action(export,"▶ PLAY LAST FIELD WAV"){
+                runCatching{
+                    val file=File(filesDir,"morphic-field-lab-v2-working.wav")
+                    require(file.isFile&&file.length()>44){"Create the first field WAV"}
+                    MediaPlayer().apply{
+                        setDataSource(file.absolutePath)
+                        setOnCompletionListener{it.release()}
+                        prepare();start()
+                    }
+                }.onFailure{Toast.makeText(this,it.message,Toast.LENGTH_LONG).show()}
+            }
+        }
+        txt(export,"This verifies the digital recording and text content. The claimed energetic field remains unverified.",10f,cool)
     }
 
     private fun buildNeuro(){
