@@ -4,16 +4,16 @@ android {
     namespace = "com.subgen.nativeapp"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.subgen.nativeapp.fouraffirmations.v327"
+        applicationId = "com.subgen.nativeapp.fourblocks.preview"
         minSdk = 29
         targetSdk = 34
-        manifestPlaceholders["appLabel"] = "Subliminal Studio Native"
-        versionCode = 21
-        versionName = "3.2.7-four-affirmations"
+        manifestPlaceholders["appLabel"] = "SubGen Four Blocks Preview"
+        versionCode = 22
+        versionName = "3.2.7-four-block-preview"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     buildTypes {
-        debug { applicationIdSuffix = ".hypertest"; versionNameSuffix = "-test"; manifestPlaceholders["appLabel"] = "SubGen v3.2.7 Test" }
+        debug { applicationIdSuffix = ".hypertest"; versionNameSuffix = "-test"; manifestPlaceholders["appLabel"] = "SubGen Four Blocks Preview" }
         release { isMinifyEnabled = false }
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
