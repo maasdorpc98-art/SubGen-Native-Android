@@ -152,9 +152,11 @@ object MorphicFieldV2 {
                 var pos=0
                 var written=0L
                 var lastPercent=-1
+                var packetByteCounter=0L
                 while(written<totalFrames){
                     if(stop())throw InterruptedException("Field render cancelled")
                     for(raw in packet){
+                        if(packetByteCounter++ % 32L == 0L && stop())throw InterruptedException("Field render cancelled")
                         for(bit in 7 downTo 0){
                             val one=((raw.toInt() ushr bit) and 1)!=0
                             val count=min(BIT_FRAMES.toLong(),totalFrames-written).toInt()
@@ -172,10 +174,10 @@ object MorphicFieldV2 {
                             written+=count
                             if(written>=totalFrames)break
                         }
+                        val progress=(written*100/totalFrames).toInt()
+                        if(progress!=lastPercent){lastPercent=progress;update("Encoding field blueprint: $progress%")}
                         if(written>=totalFrames)break
                     }
-                    val progress=(written*100/totalFrames).toInt()
-                    if(progress!=lastPercent){lastPercent=progress;update("Encoding field blueprint: $progress%")}
                 }
                 if(pos>0)out.write(pcm,0,pos)
             }
