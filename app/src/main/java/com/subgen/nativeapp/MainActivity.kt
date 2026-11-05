@@ -66,14 +66,24 @@ class MainActivity:Activity(){
         root.addView(tabs,LinearLayout.LayoutParams(-1,-2).apply{setMargins(16.dp,12.dp,16.dp,6.dp)})
         contents=FrameLayout(this)
         root.addView(contents,LinearLayout.LayoutParams(-1,0,1f))
-        val subButton=tab(tabs,"⚙  STUDIO")
-        val hypButton=tab(tabs,"◈  HYPNOSIS ENGINE")
-        subButton.setOnClickListener{
-            activateTab(subButton,hypButton);openSubliminal()
+        val subButton=tab(tabs,"⚙ STUDIO")
+        val hypButton=tab(tabs,"◈ HYPNOSIS")
+        val morphButton=tab(tabs,"◇ MORPHIC")
+        val tabButtons=listOf(subButton,hypButton,morphButton)
+        fun selectTab(selected:TextView) {
+            tabButtons.forEach { item ->
+                if(item==selected) {
+                    item.background=gradient(Color.rgb(66,28,39),Color.rgb(38,24,38),12)
+                    item.setTextColor(accentBright)
+                } else {
+                    item.background=shape(Color.TRANSPARENT)
+                    item.setTextColor(muted)
+                }
+            }
         }
-        hypButton.setOnClickListener{
-            activateTab(hypButton,subButton);openHypnosis()
-        }
+        subButton.setOnClickListener{selectTab(subButton);openSubliminal()}
+        hypButton.setOnClickListener{selectTab(hypButton);openHypnosis()}
+        morphButton.setOnClickListener{selectTab(morphButton);openMorphic()}
         val strip=LinearLayout(this).apply{
             orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL
             background=shape(Color.rgb(17,27,31),Color.rgb(26,82,76),12)
@@ -141,6 +151,49 @@ class MainActivity:Activity(){
         button(outputCard,"STOP RENDER · KEEP SAVED BLOCKS",false).setOnClickListener{startAction(RenderService.ACTION_CANCEL)}
         label(outputCard,"Press Home during rendering: a foreground notification will remain. Android can still stop the job if you force-stop the app or the OS kills it.",12,false,muted)
     }
+    private fun openMorphic() {
+        val content=scrollPane();contents.removeAllViews();contents.addView(content)
+        val col=content.getChildAt(0) as LinearLayout
+        val input=section(col,"04   MORPHIC FIELD · WRITTEN AFFIRMATIONS")
+        label(input,"EXPERIMENTAL TEXT-TO-WAVEFORM ENCODING · NO SPOKEN AUDIO",11,false,muted)
+        edit(input,"Output filename",p.getString("morphicName","Morphic Field")?:"Morphic Field",true){putString("morphicName",it)}
+        val editor=EditText(this).apply {
+            setText(p.getString("morphicText","")?:"")
+            setTextColor(textColor);setHintTextColor(muted)
+            hint="Paste written affirmations here, one per line"
+            textSize=15f;minLines=10;setSingleLine(false);gravity=Gravity.TOP
+            setPadding(12.dp,12.dp,12.dp,12.dp)
+            background=shape(Color.rgb(15,22,30),Color.rgb(60,65,86),14)
+            inputType=android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+                android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+        }
+        input.addView(editor,LinearLayout.LayoutParams(-1,270.dp).apply{bottomMargin=12.dp})
+        editor.addTextChangedListener(object:TextWatcher {
+            override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){}
+            override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int) {
+                p.edit().putString("morphicText",s?.toString()?:"").apply()
+            }
+            override fun afterTextChanged(s:Editable?){}
+        })
+        button(input,"IMPORT WRITTEN AFFIRMATIONS · TXT",false).setOnClickListener{
+            chooseMorphicText()
+        }
+        val settings=section(col,"02   FIELD WAVEFORM SETTINGS")
+        slider(settings,"Output length",1,60,p.getInt("morphicMinutes",5)," minutes"){
+            p.edit().putInt("morphicMinutes",it).apply()
+        }
+        label(settings,"UTF-8 text · 800/1600 Hz encoding · 24 kHz mono WAV · 16-bit PCM",12,false,muted)
+        label(settings,"Every affirmation is encoded into the audio data. This is an experimental waveform; morphic field effects have not been scientifically established.",12,false,muted)
+        button(settings,"GENERATE MORPHIC FIELD WAV",true).setOnClickListener{
+            p.edit().putString("morphicText",editor.text.toString()).apply()
+            startAction(RenderService.ACTION_MORPHIC)
+        }
+        button(settings,"STOP GENERATION",false).setOnClickListener{
+            startAction(RenderService.ACTION_CANCEL)
+        }
+        label(settings,"After rendering, the engine decodes the WAV and verifies the exact written text before saving to Downloads/SubGen.",11,false,muted)
+    }
     private fun openSubliminal(){
         val content=scrollPane();contents.removeAllViews();contents.addView(content)
         val col=content.getChildAt(0) as LinearLayout
@@ -168,6 +221,12 @@ class MainActivity:Activity(){
             @Suppress("DEPRECATION") startActivityForResult(pick,code)
         }
     }
+    private fun chooseMorphicText(){
+        val pick=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{
+            addCategory(Intent.CATEGORY_OPENABLE);type="text/plain"
+        }
+        @Suppress("DEPRECATION") startActivityForResult(pick,811)
+    }
     private fun chooseText(){val pick=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="text/plain"}
         @Suppress("DEPRECATION") startActivityForResult(pick,810)}
     @Deprecated("Android Activity callback for document picker")
@@ -177,6 +236,10 @@ class MainActivity:Activity(){
         try{
             if(requestCode==810){val script=contentResolver.openInputStream(uri)!!.bufferedReader().use{it.readText()};
                 p.edit().putString("script",script).apply();openHypnosis();return
+            }
+            if(requestCode==811){
+                val text=contentResolver.openInputStream(uri)!!.bufferedReader().use{it.readText()}
+                p.edit().putString("morphicText",text).apply();openMorphic();return
             }
             val key=imports[requestCode]?:return
             val target=File(filesDir,"import-$key.wav")
