@@ -60,6 +60,8 @@ class MainActivity : Activity() {
     private lateinit var tabStudio:TextView
     private lateinit var tabHypnosis:TextView
     private lateinit var tabNeuro:TextView
+    private lateinit var tabMorphic:TextView
+    private var morphicStatusText:TextView?=null
     private var neuroStatusText:TextView?=null
     private var neuroPlayer:MediaPlayer?=null
     private var neuroOutputVisible=false
@@ -184,26 +186,33 @@ class MainActivity : Activity() {
             val v=TextView(this).apply{text=label;gravity=Gravity.CENTER;textSize=10f;typeface=mono;letterSpacing=.17f;setTextColor(cool);setPadding(d(6),d(14),d(6),d(14))}
             tabs.addView(v,LinearLayout.LayoutParams(0,-2,1f));return v
         }
-        tabStudio=tab("⚙  STUDIO")
-        tabHypnosis=tab("🧠 HYPNOSIS ENGINE")
-        tabNeuro=tab("≈ NEUROMOD")
+        tabStudio=tab("⚙ STUDIO")
+        tabHypnosis=tab("🧠 HYPNOSIS")
+        tabNeuro=tab("≈ FREQUENCY")
+        tabMorphic=tab("◇ MORPHIC")
         tabStudio.setOnClickListener{showTab("studio")}
         tabHypnosis.setOnClickListener{showTab("hypnosis")}
         tabNeuro.setOnClickListener{showTab("neuro")}
+        tabMorphic.setOnClickListener{showTab("morphic")}
         space(header,26)
     }
-    private fun showTab(name:String){activeTab=name;refreshHyp=null;neuroStatusText=null;neuroOutputVisible=false;body.removeAllViews();slides.clear();checks.clear();selects.clear();sourceLabels.clear()
+    private fun showTab(name:String){activeTab=name;refreshHyp=null;neuroStatusText=null;morphicStatusText=null;neuroOutputVisible=false;body.removeAllViews();slides.clear();checks.clear();selects.clear();sourceLabels.clear()
         val onBg=cardShape(Color.rgb(52,26,34),Color.rgb(155,33,39),8)
         tabStudio.background=if(name=="studio")onBg else null
         tabHypnosis.background=if(name=="hypnosis")cardShape(Color.rgb(52,26,34),Color.rgb(155,33,39),8) else null
         tabNeuro.background=if(name=="neuro")cardShape(Color.rgb(52,26,34),Color.rgb(155,33,39),8) else null
+        tabMorphic.background=if(name=="morphic")cardShape(Color.rgb(52,26,34),Color.rgb(155,33,39),8) else null
         tabStudio.setTextColor(if(name=="studio")coral else cool)
         tabHypnosis.setTextColor(if(name=="hypnosis")coral else cool)
         tabNeuro.setTextColor(if(name=="neuro")coral else cool)
-        when(name){"studio"->buildStudio();"neuro"->buildNeuro();else->buildHypnosis()}
+        tabMorphic.setTextColor(if(name=="morphic")coral else cool)
+        when(name){"studio"->buildStudio();"neuro"->buildNeuro();"morphic"->buildMorphic();else->buildHypnosis()}
     }
     private fun refreshStatus(){
         if(::status.isInitialized)status.text=StateStore.status(this)
+        if(activeTab=="morphic"){
+            morphicStatusText?.text=p.getString("morphic:status","Ready · written text waveform encoder")
+        }
         if(activeTab=="neuro"){
             neuroStatusText?.text=p.getString("neuro:status","Ready for spoken audio")
             val mode=p.getString("neuro:mode","A")?:"A"
@@ -561,6 +570,87 @@ class MainActivity : Activity() {
     private fun chooseJson(code:Int){val i=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="application/json"}
         @Suppress("DEPRECATION")startActivityForResult(i,code)
     }
+
+    /** Experimental fourth generator; no changes to the original three engines. */
+    private fun buildMorphic(){
+        val intro=panel(body,fill=Color.rgb(24,18,27),border=Color.rgb(130,36,54),padding=18)
+        txt(intro,"MORPHIC FIELD GENERATOR",21f,coral,true,tracking=.11f,gravity=Gravity.CENTER)
+        txt(intro,"WRITTEN AFFIRMATIONS → DIGITAL WAVEFORM · OFFLINE",10f,cool,gravity=Gravity.CENTER)
+        txt(intro,"Encodes exact UTF-8 text into a repeatable WAV signal. Digital recovery verifies the encoding; energetic morphic-field effects remain unverified.",10f,cool)
+        val source=section(body,"01 — Written Affirmations")
+        val input=EditText(this).apply {
+            setText(p.getString("morphicText","")?:"")
+            setTextColor(bright);setHintTextColor(cool)
+            hint="Paste your written affirmations here, one per line"
+            textSize=14f;minLines=10;setSingleLine(false);gravity=Gravity.TOP
+            setPadding(d(12),d(12),d(12),d(12))
+            background=cardShape(Color.rgb(14,20,29),Color.rgb(79,63,90),10)
+            inputType=android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+                android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+        }
+        source.addView(input,params(d(245)))
+        input.addTextChangedListener(object:TextWatcher{
+            override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){}
+            override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){
+                p.edit().putString("morphicText",s?.toString()?:"").apply()
+            }
+            override fun afterTextChanged(s:Editable?){}
+        })
+        action(source,"▣ IMPORT WRITTEN AFFIRMATIONS · TXT"){
+            val intent=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{
+                addCategory(Intent.CATEGORY_OPENABLE);type="text/plain"
+            }
+            @Suppress("DEPRECATION") startActivityForResult(intent,960)
+        }
+        val settings=section(body,"02 — Generator Settings")
+        txt(settings,"EXACT UTF-8 ENCODING · 800/1600 Hz · 24 kHz · PCM16 MONO",10f,cool)
+        val selected=p.getInt("morphicMinutes",5).coerceIn(1,60)
+        txt(settings,"DURATION · $selected MINUTES",12f,bright,true)
+        val timeRow=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
+        settings.addView(timeRow,params())
+        for(minutes in listOf(1,3,5,10,20,30,60)){
+            val v=TextView(this).apply{
+                text=minutes.toString();textSize=10f;typeface=mono
+                gravity=Gravity.CENTER;setPadding(d(2),d(12),d(2),d(12))
+                background=cardShape(if(minutes==selected)Color.rgb(100,39,52) else surface2,
+                    if(minutes==selected)coral else Color.rgb(64,45,58),8)
+                setTextColor(if(minutes==selected)bright else cool)
+                setOnClickListener{p.edit().putInt("morphicMinutes",minutes).apply();showTab("morphic")}
+            }
+            timeRow.addView(v,LinearLayout.LayoutParams(0,-2,1f).apply{marginEnd=d(3)})
+        }
+        txt(settings,"Longer texts require enough output time to encode one complete copy. The engine will explain if more time is needed.",10f,cool)
+        val export=section(body,"03 — Generate & Verify WAV")
+        txt(export,"OUTPUT FILE NAME",10f,cool,monoFont=true)
+        val name=EditText(this).apply{
+            setSingleLine(true);setText(p.getString("morphicName","Morphic Field")?:"Morphic Field")
+            setTextColor(bright);textSize=14f
+            setPadding(d(12),d(10),d(12),d(10))
+            background=cardShape(Color.rgb(14,20,29),Color.rgb(79,63,90),10)
+        }
+        export.addView(name,params(d(45)))
+        name.addTextChangedListener(object:TextWatcher{
+            override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){}
+            override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){
+                p.edit().putString("morphicName",s?.toString()?:"").apply()
+            }
+            override fun afterTextChanged(s:Editable?){}
+        })
+        action(export,"GENERATE MORPHIC WAVEFORM WAV","primary"){
+            val text=input.text.toString()
+            if(text.isBlank()){
+                Toast.makeText(this,"Enter written affirmations first",Toast.LENGTH_LONG).show()
+                return@action
+            }
+            p.edit().putString("morphicText",text).putString("morphicName",name.text.toString()).apply()
+            startAction(RenderService.ACTION_MORPHIC)
+        }
+        action(export,"STOP GENERATION"){startAction(RenderService.ACTION_CANCEL)}
+        morphicStatusText=txt(export,p.getString("morphic:status","Ready · written text waveform encoder")?:"Ready",11f,green)
+        txt(export,"After generation the text is decoded from the saved waveform and SHA-256 checked before export to Downloads/SubGen.",10f,cool)
+    }
+
     private fun buildNeuro(){
         val chosen=p.getString("neuro:mode","A")?:"A"
         val intro=panel(body,fill=Color.rgb(24,18,27),border=Color.rgb(130,36,54),padding=18)
@@ -1200,6 +1290,12 @@ class MainActivity : Activity() {
         val uri=data?.data?:data?.clipData?.takeIf{it.itemCount==1}?.getItemAt(0)?.uri?:return
         runCatching{
             when(requestCode){
+                960->{
+                    val text=contentResolver.openInputStream(uri)!!.bufferedReader().use{it.readText()}
+                    require(text.toByteArray(Charsets.UTF_8).size<=16384){"Text exceeds 16 KB encoding limit"}
+                    p.edit().putString("morphicText",text).apply()
+                    if(activeTab=="morphic")showTab("morphic")
+                }
                 930->{
                     // SAF source kept in private storage. Import is off the UI thread for large recordings.
                     val incoming=uri
