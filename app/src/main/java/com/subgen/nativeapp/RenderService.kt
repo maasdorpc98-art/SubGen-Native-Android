@@ -136,28 +136,38 @@ class RenderService:Service() {
         update("BEST: ${best.first} threads · ${p.getString("benchmark","")}")
     }
     private fun runMorphic(){
-        Diagnostics.stage("MORPHIC_TEXT_ENCODING")
+        Diagnostics.stage("FIELD_LAB_V2_PREPARE")
         val p=renderSettings?:PreferenceSnapshot(StateStore.prefs(this))
         val live=StateStore.prefs(this)
-        val text=p.getString("morphicText","").orEmpty()
+        val blueprint=MorphicFieldV2.Blueprint(
+            p.getString("morphicObjective","").orEmpty(),
+            p.getString("morphicInstructions","").orEmpty(),
+            p.getString("morphicText","").orEmpty()
+        ).validated()
         val minutes=p.getInt("morphicMinutes",5).coerceIn(1,60)
+        val profile=if(p.getString("morphicProfile","ambient")=="signal")
+            MorphicFieldV2.Profile.SIGNAL else MorphicFieldV2.Profile.AMBIENT
         val name=p.getString("morphicName","Morphic Field")?:"Morphic Field"
-        require(text.isNotBlank()){"Enter written affirmations first"}
-        val output=File(filesDir,"morphic-working.wav")
-        fun morphStatus(message:String){
+        val output=File(filesDir,"morphic-field-lab-v2-working.wav")
+        fun status(message:String){
             live.edit().putString("morphic:status",message).apply()
             update(message)
         }
-        morphStatus("Encoding written affirmations…")
-        val report=MorphicFieldEngine.render(text,minutes,output,::morphStatus){cancelled.get()}
-        if(cancelled.get())throw InterruptedException("Morphic render cancelled")
-        morphStatus("Decoding WAV and checking exact text…")
-        require(MorphicFieldEngine.verifyText(output)==text){"Morphic waveform text roundtrip failed"}
-        if(cancelled.get())throw InterruptedException("Morphic render cancelled before export")
-        morphStatus("Saving verified WAV to Downloads/SubGen…")
+        status("Creating written field blueprint…")
+        val result=MorphicFieldV2.render(blueprint,minutes,profile,output,::status){cancelled.get()}
+        if(cancelled.get())throw InterruptedException("Field render cancelled")
+        status("Decoding finished audio to verify complete field blueprint…")
+        val verified=MorphicFieldV2.verify(output)
+        require(verified.blueprint==blueprint && verified.profile==profile &&
+                verified.sha256==result.sha256){"Field blueprint audio verification failed"}
+        if(cancelled.get())throw InterruptedException("Field render cancelled before export")
+        status("Saving verified field WAV to Downloads/SubGen…")
         val uri=WavIO.saveToDownloads(this,output,name)
-        live.edit().putString("morphicLastUri",uri.toString()).apply()
-        morphStatus("SAVED · MORPHIC WAV · text verified · ${report.completeCycles} cycles · Downloads/SubGen")
+        live.edit().putString("morphicLastUri",uri.toString())
+            .putString("morphicLastHash",verified.sha256)
+            .putString("morphicLastProfile",profile.label)
+            .putLong("morphicLastCycles",verified.completeCycles).apply()
+        status("SAVED · ${profile.label.uppercase()} WAV · blueprint verified · ${verified.completeCycles} cycles · Downloads/SubGen")
     }
     private fun runSubliminal(){
         Diagnostics.stage("SUBLIMINAL_PREPARE")
