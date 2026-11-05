@@ -28,7 +28,7 @@ class RenderService:Service() {
     override fun onStartCommand(intent:Intent?,flags:Int,startId:Int):Int {
         // Android must not automatically replay a failed native inference after process death.
         val request=intent?.action
-        if(request == null || request !in setOf(ACTION_RENDER,ACTION_INSTALL,ACTION_BENCHMARK,ACTION_PREVIEW,ACTION_SUBLIMINAL,ACTION_CANCEL)) {
+        if(request == null || request !in setOf(ACTION_RENDER,ACTION_INSTALL,ACTION_BENCHMARK,ACTION_PREVIEW,ACTION_SUBLIMINAL,ACTION_MORPHIC,ACTION_CANCEL)) {
             Diagnostics.record("IGNORED_SERVICE_RESTART", "No explicit valid user-initiated action")
             stopSelfResult(startId)
             return START_NOT_STICKY
@@ -49,7 +49,7 @@ class RenderService:Service() {
                 val started=SystemClock.elapsedRealtime()
                 var outcome="success"
                 Diagnostics.startJob(intent?.action ?: "hypnosis-render")
-                try {acquireWake();when(intent?.action){ACTION_INSTALL->installOnly();ACTION_SUBLIMINAL->runSubliminal();ACTION_BENCHMARK->benchmark();ACTION_PREVIEW->previewVoice();ACTION_RENDER->runJob();else->error("Unsupported action")}}
+                try {acquireWake();when(intent?.action){ACTION_INSTALL->installOnly();ACTION_SUBLIMINAL->runSubliminal();ACTION_MORPHIC->runMorphic();ACTION_BENCHMARK->benchmark();ACTION_PREVIEW->previewVoice();ACTION_RENDER->runJob();else->error("Unsupported action")}}
                 catch(t:Throwable){outcome="failed";Diagnostics.failure("JOB_FAILED",t);update("Stopped: ${t.message?:t.javaClass.simpleName}")}
                 finally {Diagnostics.finishJob(if(cancelled.get())"cancelled" else outcome,SystemClock.elapsedRealtime()-started);StateStore.active(this,false);releaseWake();busy.set(false);stopForeground(STOP_FOREGROUND_REMOVE);stopSelfResult(startId)}
             }
@@ -134,6 +134,30 @@ class RenderService:Service() {
             .put("threads",best.first).put("rtf",best.second))
         p.edit().putInt("threads",best.first).putString("benchmark",results.joinToString(" · "){"${it.first} threads RTF ${"%.2f".format(it.second)}"}).apply()
         update("BEST: ${best.first} threads · ${p.getString("benchmark","")}")
+    }
+    private fun runMorphic(){
+        Diagnostics.stage("MORPHIC_TEXT_ENCODING")
+        val p=renderSettings?:PreferenceSnapshot(StateStore.prefs(this))
+        val live=StateStore.prefs(this)
+        val text=p.getString("morphicText","").orEmpty()
+        val minutes=p.getInt("morphicMinutes",5).coerceIn(1,60)
+        val name=p.getString("morphicName","Morphic Field")?:"Morphic Field"
+        require(text.isNotBlank()){"Enter written affirmations first"}
+        val output=File(filesDir,"morphic-working.wav")
+        fun morphStatus(message:String){
+            live.edit().putString("morphic:status",message).apply()
+            update(message)
+        }
+        morphStatus("Encoding written affirmations…")
+        val report=MorphicFieldEngine.render(text,minutes,output,::morphStatus){cancelled.get()}
+        if(cancelled.get())throw InterruptedException("Morphic render cancelled")
+        morphStatus("Decoding WAV and checking exact text…")
+        require(MorphicFieldEngine.verifyText(output)==text){"Morphic waveform text roundtrip failed"}
+        if(cancelled.get())throw InterruptedException("Morphic render cancelled before export")
+        morphStatus("Saving verified WAV to Downloads/SubGen…")
+        val uri=WavIO.saveToDownloads(this,output,name)
+        live.edit().putString("morphicLastUri",uri.toString()).apply()
+        morphStatus("SAVED · MORPHIC WAV · text verified · ${report.completeCycles} cycles · Downloads/SubGen")
     }
     private fun runSubliminal(){
         Diagnostics.stage("SUBLIMINAL_PREPARE")
@@ -449,5 +473,5 @@ class RenderService:Service() {
     private fun acquireWake(){wakeLock=(getSystemService(POWER_SERVICE) as PowerManager).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,"SubGen:HypnosisRender").apply{setReferenceCounted(false);acquire(5*60*60*1000L)}}
     private fun releaseWake(){if(wakeLock?.isHeld==true)wakeLock?.release();wakeLock=null}
     override fun onDestroy(){cancelled.set(true);StateStore.active(this,false);releaseWake();executor.shutdown();super.onDestroy()}
-    companion object{const val ACTION_RENDER="com.subgen.nativeapp.RENDER";const val ACTION_CANCEL="com.subgen.nativeapp.CANCEL";const val ACTION_INSTALL="com.subgen.nativeapp.INSTALL";const val ACTION_BENCHMARK="com.subgen.nativeapp.BENCHMARK";const val ACTION_PREVIEW="com.subgen.nativeapp.PREVIEW";const val ACTION_SUBLIMINAL="com.subgen.nativeapp.SUBLIMINAL";const val CHANNEL="subgen-hypnosis";const val ID=9021}
+    companion object{const val ACTION_RENDER="com.subgen.nativeapp.RENDER";const val ACTION_CANCEL="com.subgen.nativeapp.CANCEL";const val ACTION_INSTALL="com.subgen.nativeapp.INSTALL";const val ACTION_BENCHMARK="com.subgen.nativeapp.BENCHMARK";const val ACTION_PREVIEW="com.subgen.nativeapp.PREVIEW";const val ACTION_SUBLIMINAL="com.subgen.nativeapp.SUBLIMINAL";const val ACTION_MORPHIC="com.subgen.nativeapp.MORPHIC";const val CHANNEL="subgen-hypnosis";const val ID=9021}
 }
