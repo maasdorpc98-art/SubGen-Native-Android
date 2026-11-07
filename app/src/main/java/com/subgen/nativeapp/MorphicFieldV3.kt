@@ -137,8 +137,9 @@ object MorphicFieldV3 {
     }
 
     /**
-     * Seven related but individually distinguishable symbolic audio cycles.
-     * Not a claim that these tones establish resonance in a physical target.
+     * Architecture-conditioned modulation: actual field-dynamics targets and
+     * source-content SHA determine seven distinguishable stereo audio patterns.
+     * Real computational attractor dynamics; no asserted external causation.
      */
     private fun architectureTone(frame:Long,plan:FieldArchitecture.Plan,ch:Int):Double {
         val t=frame.toDouble()/RATE
@@ -146,11 +147,15 @@ object MorphicFieldV3 {
         val cycles=doubleArrayOf(18.0,45.0,120.0,29.0,63.0,96.0,150.0)
         val tones=doubleArrayOf(231.0,277.18,311.13,369.99,415.3,466.16,554.37)
         for(i in plan.nodes.indices){
-            val node=plan.nodes[i]
-            val phase=i*.41+(if(ch==0)0.0 else .21)
-            val level=.0004+node.intensity*.00010
-            val envelope=.6+.4*sin(2.0*PI*t/cycles[i]+phase)
-            mix+=level*envelope*sin(2.0*PI*tones[i]*t+phase)
+            val target=plan.dynamics.target[i]
+            val hashByte=plan.sourceSha256.substring(i*2,i*2+2).toInt(16)
+            val signature=hashByte/255.0
+            val phase=i*.41+signature*2.0*PI+(if(ch==0)0.0 else .21)
+            val cycle=cycles[i]*(0.8+0.4*target)
+            val frequency=tones[i]+26.0*(signature-.5)+12.0*(target-.5)
+            val level=.0004+.0012*target
+            val envelope=.6+.4*sin(2.0*PI*t/cycle+phase)
+            mix+=level*envelope*sin(2.0*PI*frequency*t+phase)
         }
         return mix
     }
