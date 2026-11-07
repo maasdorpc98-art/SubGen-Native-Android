@@ -633,7 +633,8 @@ class MainActivity : Activity() {
             instructions.setText(result.instructions)
             p.edit().putString("morphicPreparedText",original)
                 .putString("morphicAnalyzedTheme",result.theme)
-                .putString("morphicPreparedHash",result.fingerprint).apply()
+                .putString("morphicPreparedHash",result.fingerprint)
+                .putString("morphicPlanVersion","3.3").apply()
             planStatus.text="PREPARED · "+result.details
             planWarnings.text=if(result.warnings.isEmpty())
                 "SOURCE TRACE · "+result.coverage+" intent functions · no review flags"
@@ -686,7 +687,8 @@ class MainActivity : Activity() {
         action(structure,"INSPECT MY SEVEN-NODE ARCHITECTURE"){
             runCatching{
                 if(objective.text.isBlank()||instructions.text.isBlank()||
-                    p.getString("morphicPreparedText","")!=affirmations.text.toString()){
+                    (p.getString("morphicPreparedText","")!=affirmations.text.toString() ||
+                    p.getString("morphicPlanVersion","")!="3.3")){
                     preparePlan()
                 }
                 val plan=FieldArchitecture.create(MorphicFieldV2.Blueprint(
@@ -770,7 +772,8 @@ class MainActivity : Activity() {
         action(settings,"AUTO-FIT DURATION TO COMPLETE FIELD"){
             runCatching{
                 if(objective.text.isBlank()||instructions.text.isBlank()||
-                    p.getString("morphicPreparedText","")!=affirmations.text.toString())preparePlan()
+                    (p.getString("morphicPreparedText","")!=affirmations.text.toString() ||
+                    p.getString("morphicPlanVersion","")!="3.3"))preparePlan()
                 val seconds=MorphicFieldV3.minimumSeconds(currentBlueprint())
                 val fit=listOf(1,3,5,10,20,30,60).firstOrNull{it*60>=seconds}
                     ?:error("This field needs more than 60 minutes. Shorten the text.")
@@ -785,7 +788,8 @@ class MainActivity : Activity() {
         fun render(autoPlan:Boolean,autoFit:Boolean){
             runCatching{
                 if(autoPlan || objective.text.isBlank() || instructions.text.isBlank() ||
-                    p.getString("morphicPreparedText","")!=affirmations.text.toString()){
+                    (p.getString("morphicPreparedText","")!=affirmations.text.toString() ||
+                    p.getString("morphicPlanVersion","")!="3.3")){
                     preparePlan()
                 }
                 val blueprint=currentBlueprint().validated()
@@ -814,6 +818,9 @@ class MainActivity : Activity() {
         val hash=p.getString("morphicLastHash","").orEmpty()
         if(hash.isNotBlank()){
             txt(export,"LAST VERIFIED DATA SHA-256 · "+hash,9f,cool,monoFont=true)
+            val waveHash=p.getString("morphicLastFileHash","").orEmpty()
+            if(waveHash.isNotBlank())
+                txt(export,"COMPLETE WAV SHA-256 · "+waveHash,9f,cool,monoFont=true)
             txt(export,"LAST OUTPUT · "+p.getString("morphicLastProfile","")+
                 " · "+p.getLong("morphicLastCycles",0)+" complete data cycles",10f,cool)
             action(export,"▶ PLAY LAST VERIFIED FIELD WAV"){
