@@ -1,8 +1,8 @@
-name: Generate Affirmation Intelligence Field WAV
+name: Generate Affirmation Intelligence Field WAV - Direct Instructions
 on:
   workflow_dispatch:
   push:
-    branches: [feature/affirmation-intelligence-field-audio-20261107]
+    branches: [feature/affirmation-intelligence-field-direct-20261107]
 jobs:
   audio:
     runs-on: ubuntu-24.04
@@ -24,13 +24,20 @@ jobs:
       - name: Generate real WAV and independently verify complete seven-node architecture
         run: |
           java -Xmx3g -jar /tmp/subgen-affirmation-intelligence-v3.jar
-          test -s test-results/affirmation-intelligence-field/SubGen_Affirmation_Intelligence_Field_Architecture_V3.wav
-          sha256sum test-results/affirmation-intelligence-field/SubGen_Affirmation_Intelligence_Field_Architecture_V3.wav
-          cat test-results/affirmation-intelligence-field/Verification_Report.txt
+          test -s test-results/affirmation-intelligence-field-direct/SubGen_Affirmation_Intelligence_Field_Architecture_V3_Recreated.wav
+          sha256sum test-results/affirmation-intelligence-field-direct/SubGen_Affirmation_Intelligence_Field_Architecture_V3_Recreated.wav
+          cat test-results/affirmation-intelligence-field-direct/Verification_Report.txt
+      - name: Confirm no fictional framing in encoded field documents
+        run: |
+          if grep -Eiq 'fictional|fantasy|hypothetical|imaginative' test-results/affirmation-intelligence-field-direct/{Field_Objective.txt,Field_Instructions.txt,Seven_Node_Field_Architecture.txt}; then
+            echo 'Unexpected fictional framing in field documents' >&2
+            exit 1
+          fi
+          grep -q '36 (I=12, My=12, You/Your=12)' test-results/affirmation-intelligence-field-direct/Verification_Report.txt
       - name: Upload final WAV and full architecture package
         uses: actions/upload-artifact@v4
         with:
-          name: SubGen-Affirmation-Intelligence-Field-V3-Audio
-          path: test-results/affirmation-intelligence-field/
+          name: SubGen-Affirmation-Intelligence-Field-V3-Direct-Instructions
+          path: test-results/affirmation-intelligence-field-direct/
           if-no-files-found: error
           compression-level: 2
