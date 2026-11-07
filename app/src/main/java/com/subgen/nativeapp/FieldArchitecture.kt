@@ -28,6 +28,7 @@ object FieldArchitecture {
         val lines:Int,
         val nodes:List<Node>,
         val edges:List<Edge>,
+        val dynamics:FieldDynamics.Report,
         val source:MorphicFieldV2.Blueprint
     ) {
         fun canonical():String {
@@ -58,7 +59,8 @@ object FieldArchitecture {
                 out.append("edge=").append(edge.from.name).append("->").append(edge.to.name)
                     .append('|').append(q(edge.purpose)).append('\n')
             }
-            out.append("status=FIELD_ARCHITECTURE_V3_INFORMATION_SPECIFICATION\n")
+            out.append(dynamics.canonical())
+            out.append("status=FIELD_ARCHITECTURE_V31_INFORMATION_SPECIFICATION\n")
             return out.toString()
         }
     }
@@ -79,6 +81,8 @@ object FieldArchitecture {
         val combined=listOf(source.objective,source.instructions,source.affirmations)
             .joinToString("\u0000") { s->s.toByteArray(Charsets.UTF_8).size.toString()+":"+s }
         val hash=sha(combined)
+        val dynamics=FieldDynamics.derive(source.affirmations,source.objective,source.instructions)
+        require(dynamics.converged){"Attractor dynamics failed to converge"}
         val id="SGF-"+hash.take(16).uppercase(Locale.US)
         val lines=source.affirmations.lines().filter{it.isNotBlank()}
         val goalCount=matches(lines,goal)
@@ -120,6 +124,6 @@ object FieldArchitecture {
             Edge(Kind.RESONANCE,Kind.MEMORY,"Maintains the association across repeated cycles"),
             Edge(Kind.MEMORY,Kind.IDENTITY,"Closes the conceptual feedback loop")
         )
-        return Plan(3,hash,id,lines.size,nodes,edges,source)
+        return Plan(31,hash,id,lines.size,nodes,edges,dynamics,source)
     }
 }
