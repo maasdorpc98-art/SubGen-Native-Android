@@ -575,10 +575,10 @@ class MainActivity : Activity() {
     /** Fourth audio section: a self-contained written-intention waveform experiment. */
     private fun buildMorphic(){
         val intro=panel(body,fill=Color.rgb(24,18,27),border=Color.rgb(130,36,54),padding=18)
-        txt(intro,"FIELD ARCHITECTURE · V3",21f,coral,true,tracking=.11f,gravity=Gravity.CENTER)
-        txt(intro,"SEVEN-LAYER INFORMATION MODEL + RECOVERABLE AUDIO",10f,cool,gravity=Gravity.CENTER)
+        txt(intro,"FIELD ARCHITECTURE · V3.1",21f,coral,true,tracking=.11f,gravity=Gravity.CENTER)
+        txt(intro,"INTENTION → FIELD ARCHITECTURE → LAYERED AUDIO",10f,cool,gravity=Gravity.CENTER)
         space(intro,8)
-        txt(intro,"Builds a seven-node conceptual field architecture from your exact written inputs, encodes it into the waveform and verifies its recovery. This is an experimental model, not evidence of a physical morphic field.",10f,cool)
+        txt(intro,"Creates an intention-specific seven-node attractor architecture, calculates its stable dynamics, generates linked audio layers and independently verifies the exact written information.",10f,cool)
 
         fun field(parent:LinearLayout,title:String,key:String,hint:String,height:Int,single:Boolean=false):EditText{
             txt(parent,title.uppercase(),10f,cool,monoFont=true)
@@ -611,7 +611,7 @@ class MainActivity : Activity() {
             "What is this field intended to support?",56,true)
         val instructions=field(design,"Field instructions · optional","morphicInstructions",
             "Describe the intended operation or conceptual design in your own words.",126)
-        txt(design,"These are specifications supplied by you, not AI-generated or verified nonphysical mechanisms.",10f,cool)
+        txt(design,"The objective and operating instructions control the field architecture. Your original text is preserved exactly.",10f,cool)
 
         val source=section(body,"02 — Written Affirmations")
         val affirmations=field(source,"Affirmations","morphicText",
@@ -627,7 +627,7 @@ class MainActivity : Activity() {
         val structure=section(body,"03 — Field Architecture")
         txt(structure,"SEVEN INTERCONNECTED COMPONENTS",10f,cool,monoFont=true)
         txt(structure,"Identity · Attractor · Interpretation · Pathways · Coherence · Resonance Model · Memory",11f,bright)
-        txt(structure,"The relationship graph is generated deterministically from the original text. The sound carries the complete graph, not just its title.",10f,cool)
+        txt(structure,"The original text determines the node relationships, computed attractor, and audio-layer parameters. The complete architecture is recoverable from the WAV.",10f,cool)
         action(structure,"INSPECT ARCHITECTURE & CONNECTIONS"){
             runCatching {
                 val plan=FieldArchitecture.create(MorphicFieldV2.Blueprint(
@@ -640,11 +640,25 @@ class MainActivity : Activity() {
                             .append("\n").append(node.description)
                             .append("\nSource matches: ").append(node.evidence).append("\n\n")
                     }
-                    append("CONNECTIONS\n")
+                    append("COMPUTED ATTRACTOR\n")
+                    plan.dynamics.target.forEachIndexed { i,target->
+                        append(plan.nodes[i].kind.title).append(": ")
+                            .append("%.4f".format(java.util.Locale.US,target)).append("\n")
+                    }
+                    append("Model convergence: ").append(plan.dynamics.converged).append("\n")
+                    append("Initial distance: ").append("%.6f".format(java.util.Locale.US,plan.dynamics.initialEnergy)).append("\n")
+                    append("Final distance: ").append("%.9f".format(java.util.Locale.US,plan.dynamics.finalEnergy)).append("\n")
+                    append("Iterations: ").append(plan.dynamics.steps).append("\n\n")
+                    append("AFFIRMATION ROLES\n")
+                    plan.dynamics.lines.take(36).forEach { role->
+                        append(role.index).append(". ").append(role.form.name)
+                            .append(" → ").append(role.primary).append("\n")
+                    }
+                    append("\nCONNECTIONS\n")
                     plan.edges.forEach{append(it.from.title).append(" → ")
                         .append(it.to.title).append("\n")}
                 }
-                AlertDialog.Builder(this).setTitle("FIELD ARCHITECTURE · V3")
+                AlertDialog.Builder(this).setTitle("FIELD ARCHITECTURE · V3.1")
                     .setMessage(summary).setPositiveButton("CLOSE",null).show()
             }.onFailure { Toast.makeText(this,it.message,Toast.LENGTH_LONG).show() }
         }
@@ -734,7 +748,7 @@ class MainActivity : Activity() {
                 }.onFailure{Toast.makeText(this,it.message,Toast.LENGTH_LONG).show()}
             }
         }
-        txt(export,"All three source inputs and the seven-node architecture are independently recovered from the WAV. A verified information model is not proof of reality-altering effects.",10f,cool)
+        txt(export,"Verification checks the WAV, complete written inputs, architecture and computed convergence. Any effects beyond the generated recording require independent testing.",10f,cool)
     }
 
     private fun buildNeuro(){
