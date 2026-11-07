@@ -183,7 +183,7 @@ object MorphicFieldV3 {
                 var written=0L
                 var lastPercent=-1
                 var packetByteCounter=0L
-                while(written<totalFrames){
+                while(written+neededFrames<=totalFrames){
                     if(stop())throw InterruptedException("Field render cancelled")
                     for(raw in packet){
                         if(packetByteCounter++ % 32L == 0L && stop())throw InterruptedException("Field render cancelled")
@@ -209,6 +209,30 @@ object MorphicFieldV3 {
                         val progress=(written*100/totalFrames).toInt()
                         if(progress!=lastPercent){lastPercent=progress;update("Encoding field blueprint: $progress%")}
                         if(written>=totalFrames)break
+                    }
+                }
+                // The remainder has intentional ambience or silence only;
+                // never leave a partial encoded packet at the end of the WAV.
+                while(written<totalFrames){
+                    if(stop())throw InterruptedException("Field render cancelled")
+                    val take=min(4096L,totalFrames-written).toInt()
+                    for(i in 0 until take){
+                        val frame=written+i
+                        for(ch in 0 until channels){
+                            val sound=if(profile==Profile.AMBIENT)
+                                pad(frame,totalFrames,ch)+architectureTone(frame,architecturePlan,ch)
+                                else 0.0
+                            val sample=WavIO.floatToS16(sound.toFloat())
+                            if(pos+2>pcm.size){out.write(pcm,0,pos);pos=0}
+                            pcm[pos++]=(sample and 255).toByte()
+                            pcm[pos++]=((sample ushr 8) and 255).toByte()
+                        }
+                    }
+                    written+=take
+                    val percent=(written*100/totalFrames).toInt()
+                    if(percent!=lastPercent){
+                        lastPercent=percent
+                        update("Completing verified field audio: $percent%")
                     }
                 }
                 if(pos>0)out.write(pcm,0,pos)
@@ -300,6 +324,17 @@ object MorphicFieldV3 {
                 blueprint.objective,blueprint.instructions,blueprint.affirmations
             )).canonical()==architecture){"Encoded architecture does not match the source"}
             val totalPacketFrames=(HEADER_BYTES+size)*8*BIT_FRAMES
+            val fullCycles=totalFrames/totalPacketFrames
+            // Every complete occurrence must contain the exact same packet.
+            // This prevents later-cycle corruption being missed when only the
+            // first source packet was checked.
+            val firstPacket=header+body
+            for(cycle in 1L until fullCycles){
+                val repeated=ByteArray(firstPacket.size){decodeByte().toByte()}
+                require(repeated.contentEquals(firstPacket)){
+                    "Field audio cycle "+(cycle+1)+" differs from the verified source"
+                }
+            }
             return Result(blueprint,profile,(totalFrames/RATE).toInt(),
                           totalFrames/totalPacketFrames,size.toInt(),hex(sha),file,architecture)
         }
