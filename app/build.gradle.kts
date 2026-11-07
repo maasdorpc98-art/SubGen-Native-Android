@@ -9,11 +9,11 @@ android {
         targetSdk = 34
         manifestPlaceholders["appLabel"] = "SubGen Four Blocks Preview"
         versionCode = 22
-        versionName = "3.2.8-auto-field"
+        versionName = "3.2.9-field-intelligence"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     buildTypes {
-        debug { applicationIdSuffix = ".autofieldv32"; versionNameSuffix = "-autofieldv32"; manifestPlaceholders["appLabel"] = "SubGen AUTO FIELD V3.2" }
+        debug { applicationIdSuffix = ".fieldintelligencev33"; versionNameSuffix = "-fieldintelligencev33"; manifestPlaceholders["appLabel"] = "SubGen FIELD INTELLIGENCE V3.3" }
         release { isMinifyEnabled = false }
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
