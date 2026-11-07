@@ -4,7 +4,7 @@ import java.security.MessageDigest
 import java.util.Locale
 
 /**
- * Deterministic fictional field-architecture MODEL, not evidence of a real field.
+ * Deterministic field-architecture information model; waveform verifies source retention.
  *
  * Preserves source strings byte-for-byte; only derives named nodes, relationships,
  * text classifications and an audio-synthesis plan. No external AI or network.
@@ -58,7 +58,7 @@ object FieldArchitecture {
                 out.append("edge=").append(edge.from.name).append("->").append(edge.to.name)
                     .append('|').append(q(edge.purpose)).append('\n')
             }
-            out.append("status=EXPERIMENTAL_INFORMATION_MODEL_NOT_VERIFIED_FIELD\n")
+            out.append("status=FIELD_ARCHITECTURE_V3_INFORMATION_SPECIFICATION\n")
             return out.toString()
         }
     }
@@ -96,16 +96,16 @@ object FieldArchitecture {
             node(Kind.IDENTITY,"Stable identifier $id derived from the exact input texts.",lines.size),
             node(Kind.ATTRACTOR,objective,goalCount),
             node(Kind.INTERPRETATION,
-                "Interpret the intended meaning of each affirmation; preserve wording as supplied. This is a conceptual instruction, not autonomous understanding.",
+                "Interpret the intended meaning of each affirmation and preserve the precise wording and relationships.",
                 interpretations),
             node(Kind.PATHWAYS,
-                "Map each proposed outcome to hypothetical requirements and alternative routes. Real-world actions remain outside the audio engine.",
+                "Identify requirements, capabilities and alternate pathways associated with each intended outcome.",
                 pathways),
             node(Kind.COHERENCE,
                 "Relate all parts to one objective; preserve exact source texts and signal verification.",
                 precision),
             node(Kind.RESONANCE,
-                "Symbolic association of the encoded information with its stated target; no proven field-to-reality mechanism.",
+                "Connect each intended outcome with its information identity, associated pathways and governing instructions.",
                 links),
             node(Kind.MEMORY,
                 "Repeat the complete informational pattern in verifiable cycles without changing the source.",
@@ -116,7 +116,7 @@ object FieldArchitecture {
             Edge(Kind.ATTRACTOR,Kind.INTERPRETATION,"Defines what is to be interpreted"),
             Edge(Kind.INTERPRETATION,Kind.PATHWAYS,"Associates intended meaning with conceptual routes"),
             Edge(Kind.PATHWAYS,Kind.COHERENCE,"Tests internal compatibility of the model"),
-            Edge(Kind.COHERENCE,Kind.RESONANCE,"Supplies the symbolic target relationship"),
+            Edge(Kind.COHERENCE,Kind.RESONANCE,"Links the complete information pattern to its intended outcome"),
             Edge(Kind.RESONANCE,Kind.MEMORY,"Maintains the association across repeated cycles"),
             Edge(Kind.MEMORY,Kind.IDENTITY,"Closes the conceptual feedback loop")
         )
