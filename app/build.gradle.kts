@@ -8,12 +8,12 @@ android {
         minSdk = 29
         targetSdk = 34
         manifestPlaceholders["appLabel"] = "SubGen Four Blocks Preview"
-        versionCode = 22
-        versionName = "3.2.7-four-block-preview"
+        versionCode = 32
+        versionName = "3.2.8-auto-field"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     buildTypes {
-        debug { applicationIdSuffix = ".fieldarchv31"; versionNameSuffix = "-fieldarchv31"; manifestPlaceholders["appLabel"] = "SubGen Field Architecture v3.1" }
+        debug { applicationIdSuffix = ".autofieldv32"; versionNameSuffix = "-autofieldv32"; manifestPlaceholders["appLabel"] = "SubGen AUTO FIELD V3.2" }
         release { isMinifyEnabled = false }
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
