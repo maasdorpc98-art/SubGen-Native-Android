@@ -8,7 +8,7 @@ android {
         minSdk = 29
         targetSdk = 34
         manifestPlaceholders["appLabel"] = "SubGen Four Blocks Preview"
-        versionCode = 32
+        versionCode = 22
         versionName = "3.2.8-auto-field"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
