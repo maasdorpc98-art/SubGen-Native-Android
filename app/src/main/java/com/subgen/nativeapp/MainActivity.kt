@@ -575,10 +575,11 @@ class MainActivity : Activity() {
     /** Fourth audio section: a self-contained written-intention waveform experiment. */
     private fun buildMorphic(){
         val intro=panel(body,fill=Color.rgb(24,18,27),border=Color.rgb(130,36,54),padding=18)
-        txt(intro,"FIELD ARCHITECTURE · V3.1",21f,coral,true,tracking=.11f,gravity=Gravity.CENTER)
-        txt(intro,"INTENTION → FIELD ARCHITECTURE → LAYERED AUDIO",10f,cool,gravity=Gravity.CENTER)
+        txt(intro,"SUBGEN · AUTO FIELD BUILDER V3.2",20f,coral,true,tracking=.08f,gravity=Gravity.CENTER)
+        txt(intro,"AFFIRMATIONS → OBJECTIVE → INSTRUCTIONS → FIELD AUDIO",10f,cool,gravity=Gravity.CENTER)
         space(intro,8)
-        txt(intro,"Creates an intention-specific seven-node attractor architecture, calculates its stable dynamics, generates linked audio layers and independently verifies the exact written information.",10f,cool)
+        txt(intro,"Paste your affirmations. The offline analyzer generates an editable field objective, operating instructions and seven-node architecture before rendering a verified WAV.",11f,bright)
+        txt(intro,"Version 3.2 · Offline rule-based analysis · All four SubGen sections preserved.",10f,cool)
 
         fun field(parent:LinearLayout,title:String,key:String,hint:String,height:Int,single:Boolean=false):EditText{
             txt(parent,title.uppercase(),10f,cool,monoFont=true)
@@ -606,76 +607,94 @@ class MainActivity : Activity() {
             return input
         }
 
-        val design=section(body,"01 — Field Concept")
-        val objective=field(design,"Intended objective","morphicObjective",
-            "What is this field intended to support?",56,true)
-        val instructions=field(design,"Field instructions · optional","morphicInstructions",
-            "Describe the intended operation or conceptual design in your own words.",126)
-        txt(design,"The objective and operating instructions control the field architecture. Your original text is preserved exactly.",10f,cool)
-
-        val source=section(body,"02 — Written Affirmations")
-        val affirmations=field(source,"Affirmations","morphicText",
-            "Paste written affirmations, one per line.",245)
-        action(source,"▣ IMPORT WRITTEN AFFIRMATIONS · TXT"){
+        val source=section(body,"01 — Paste Your Affirmations")
+        val affirmations=field(source,"Exact written affirmations","morphicText",
+            "Paste any I, My, You/Your or other written affirmations here, one per line.",260)
+        action(source,"▣ IMPORT AFFIRMATIONS · TXT"){
             val intent=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{
                 addCategory(Intent.CATEGORY_OPENABLE);type="text/plain"
             }
             @Suppress("DEPRECATION") startActivityForResult(intent,960)
         }
-        txt(source,"Every line and punctuation mark is retained as UTF-8 text inside the waveform.",10f,cool)
+        txt(source,"Original text, spelling, line order and punctuation are preserved byte-for-byte in the audio.",10f,cool)
 
-        val structure=section(body,"03 — Field Architecture")
-        txt(structure,"SEVEN INTERCONNECTED COMPONENTS",10f,cool,monoFont=true)
-        txt(structure,"Identity · Attractor · Interpretation · Pathways · Coherence · Resonance Model · Memory",11f,bright)
-        txt(structure,"The original text determines the node relationships, computed attractor, and audio-layer parameters. The complete architecture is recoverable from the WAV.",10f,cool)
-        action(structure,"INSPECT ARCHITECTURE & CONNECTIONS"){
-            runCatching {
+        val design=section(body,"02 — Automatically Generate Field Plan")
+        txt(design,"From the affirmations, SubGen infers the central intended outcome and writes complete operating instructions. You can review or refine both before rendering.",11f,bright)
+        val objective=field(design,"Intended objective · generated + editable","morphicObjective",
+            "Tap ANALYZE & WRITE below to generate the objective.",105)
+        val instructions=field(design,"Field instructions · generated + editable","morphicInstructions",
+            "SubGen will write the complete operating structure.",220)
+        val planStatus=txt(design,"Ready to analyze the written set.",10f,cool)
+        fun preparePlan():AutoFieldComposer.Analysis{
+            val original=affirmations.text.toString()
+            val result=AutoFieldComposer.compose(original)
+            objective.setText(result.objective)
+            instructions.setText(result.instructions)
+            p.edit().putString("morphicPreparedText",original)
+                .putString("morphicAnalyzedTheme",result.theme).apply()
+            planStatus.text="PREPARED · "+result.details
+            return result
+        }
+        action(design,"ANALYZE & WRITE FIELD OBJECTIVE + INSTRUCTIONS","primary"){
+            runCatching{preparePlan()}.onFailure{
+                Toast.makeText(this,it.message,Toast.LENGTH_LONG).show()
+            }
+        }
+        txt(design,"Analysis is local and deterministic, not an AI language model. Check the inferred meaning before final use.",10f,cool)
+
+        val structure=section(body,"03 — Field Architecture Inspector")
+        txt(structure,"IDENTITY · ATTRACTOR · INTERPRETATION · PATHWAYS · COHERENCE · RESONANCE · MEMORY",11f,bright)
+        action(structure,"INSPECT MY SEVEN-NODE ARCHITECTURE"){
+            runCatching{
+                if(objective.text.isBlank()||instructions.text.isBlank()||
+                    p.getString("morphicPreparedText","")!=affirmations.text.toString()){
+                    preparePlan()
+                }
                 val plan=FieldArchitecture.create(MorphicFieldV2.Blueprint(
                     objective.text.toString(),instructions.text.toString(),affirmations.text.toString()))
-                val summary=buildString {
+                val summary=buildString{
                     append("FIELD ID: ").append(plan.fieldId).append("\n")
-                    append("Affirmations: ").append(plan.lines).append("\n\n")
-                    plan.nodes.forEachIndexed { idx,node->
-                        append(idx+1).append(". ").append(node.kind.title.uppercase())
+                    append("AFFIRMATIONS: ").append(plan.lines).append("\n\n")
+                    plan.nodes.forEachIndexed{ i,node->
+                        append(i+1).append(". ").append(node.kind.title.uppercase())
                             .append("\n").append(node.description)
                             .append("\nSource matches: ").append(node.evidence).append("\n\n")
                     }
-                    append("COMPUTED ATTRACTOR\n")
-                    plan.dynamics.target.forEachIndexed { i,target->
-                        append(plan.nodes[i].kind.title).append(": ")
-                            .append("%.4f".format(java.util.Locale.US,target)).append("\n")
-                    }
-                    append("Model convergence: ").append(plan.dynamics.converged).append("\n")
-                    append("Initial distance: ").append("%.6f".format(java.util.Locale.US,plan.dynamics.initialEnergy)).append("\n")
-                    append("Final distance: ").append("%.9f".format(java.util.Locale.US,plan.dynamics.finalEnergy)).append("\n")
-                    append("Iterations: ").append(plan.dynamics.steps).append("\n\n")
+                    append("ATTRACTOR CONVERGENCE\n")
+                    append("Converged: ").append(plan.dynamics.converged)
+                        .append(" · Iterations: ").append(plan.dynamics.steps).append("\n")
+                    append("Distance: ")
+                        .append("%.6f".format(java.util.Locale.US,plan.dynamics.initialEnergy))
+                        .append(" → ")
+                        .append("%.9f".format(java.util.Locale.US,plan.dynamics.finalEnergy))
+                        .append("\n\n")
                     append("AFFIRMATION ROLES\n")
-                    plan.dynamics.lines.take(36).forEach { role->
-                        append(role.index).append(". ").append(role.form.name)
-                            .append(" → ").append(role.primary).append("\n")
+                    plan.dynamics.lines.take(24).forEach{role->
+                        append(role.index).append(" · ").append(role.form.name)
+                            .append(" · ").append(role.primary).append("\n")
                     }
-                    append("\nCONNECTIONS\n")
-                    plan.edges.forEach{append(it.from.title).append(" → ")
-                        .append(it.to.title).append("\n")}
+                    append("\nRELATIONSHIP GRAPH\n")
+                    plan.edges.forEach{edge->
+                        append(edge.from.title).append(" → ").append(edge.to.title).append("\n")
+                    }
                 }
-                AlertDialog.Builder(this).setTitle("FIELD ARCHITECTURE · V3.1")
+                AlertDialog.Builder(this).setTitle("FIELD ARCHITECTURE · V3.2")
                     .setMessage(summary).setPositiveButton("CLOSE",null).show()
-            }.onFailure { Toast.makeText(this,it.message,Toast.LENGTH_LONG).show() }
+            }.onFailure{Toast.makeText(this,it.message,Toast.LENGTH_LONG).show()}
         }
-        val settings=section(body,"04 — Sound & Duration")
+
+        val settings=section(body,"04 — Sound and Length")
         txt(settings,"AUDIO PROFILE",10f,cool,monoFont=true)
         val selectedProfile=p.getString("morphicProfile","ambient")?:"ambient"
-        action(settings,(if(selectedProfile=="ambient")"● " else "○ ")+"AMBIENT · STEREO SOUNDSCAPE"){
+        action(settings,(if(selectedProfile=="ambient")"● " else "○ ")+"AMBIENT · STEREO"){
             p.edit().putString("morphicProfile","ambient").apply();showTab("morphic")
         }
-        txt(settings,"Soft original tonal layers under the data signal · 24 kHz stereo WAV.",10f,cool)
-        action(settings,(if(selectedProfile=="signal")"● " else "○ ")+"SIGNAL · PURE TEXT ENCODING"){
+        action(settings,(if(selectedProfile=="signal")"● " else "○ ")+"SIGNAL · MONO"){
             p.edit().putString("morphicProfile","signal").apply();showTab("morphic")
         }
-        txt(settings,"Unmixed 800/1600 Hz frequency shift encoding · 24 kHz mono WAV.",10f,cool)
-        space(settings,12)
+        txt(settings,"Stereo ambience combines gentle original tonal layers with the recoverable encoded field. Both formats are 24 kHz PCM WAV.",10f,cool)
         val selected=p.getInt("morphicMinutes",5).coerceIn(1,60)
-        txt(settings,"DURATION · $selected MINUTES",12f,bright,true)
+        txt(settings,"SELECTED DURATION · "+selected+" MINUTES",12f,bright,true)
         val timeRow=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
         settings.addView(timeRow,params())
         for(minutes in listOf(1,3,5,10,20,30,60)){
@@ -689,57 +708,71 @@ class MainActivity : Activity() {
             }
             timeRow.addView(view,LinearLayout.LayoutParams(0,-2,1f).apply{marginEnd=d(3)})
         }
-        val capacity=txt(settings,"One complete field blueprint must fit within the duration.",10f,cool)
+        val capacity=txt(settings,"Generate the field plan to calculate the minimum complete-cycle duration.",10f,cool)
         fun currentBlueprint()=MorphicFieldV3.Blueprint(
             objective.text.toString(),instructions.text.toString(),affirmations.text.toString())
-        fun showCapacity(){
-            capacity.text=runCatching {
-                val seconds=MorphicFieldV3.minimumSeconds(currentBlueprint())
-                val cycles=(selected*60)/seconds.coerceAtLeast(1)
-                "Required: $seconds seconds minimum · complete cycles within selected duration: $cycles"
-            }.getOrElse{"Enter affirmations to estimate required encoding time."}
+        fun updateCapacity(){
+            capacity.text=runCatching{
+                val needed=MorphicFieldV3.minimumSeconds(currentBlueprint())
+                val available=selected*60
+                "Minimum complete data cycle: "+needed+" seconds · "+
+                    (if(needed<=available)"Fits selected duration" else "Choose a longer duration")
+            }.getOrElse{"Enter affirmations and generate the field plan to calculate capacity."}
         }
-        showCapacity()
-        action(settings,"AUTO-FIT DURATION"){
-            val seconds=runCatching{MorphicFieldV3.minimumSeconds(currentBlueprint())}
-                .getOrElse{Toast.makeText(this,it.message,Toast.LENGTH_LONG).show();return@action}
-            val fit=listOf(1,3,5,10,20,30,60).firstOrNull{it*60>=seconds}
-            if(fit==null){
-                Toast.makeText(this,"Too much text for a 60-minute field WAV",Toast.LENGTH_LONG).show()
-                return@action
-            }
-            p.edit().putInt("morphicMinutes",fit).apply();showTab("morphic")
+        updateCapacity()
+        action(settings,"AUTO-FIT DURATION TO COMPLETE FIELD"){
+            runCatching{
+                if(objective.text.isBlank()||instructions.text.isBlank()||
+                    p.getString("morphicPreparedText","")!=affirmations.text.toString())preparePlan()
+                val seconds=MorphicFieldV3.minimumSeconds(currentBlueprint())
+                val fit=listOf(1,3,5,10,20,30,60).firstOrNull{it*60>=seconds}
+                    ?:error("This field needs more than 60 minutes. Shorten the text.")
+                p.edit().putInt("morphicMinutes",fit).apply()
+                showTab("morphic")
+            }.onFailure{Toast.makeText(this,it.message,Toast.LENGTH_LONG).show()}
         }
 
-        val export=section(body,"05 — Render, Verify & Export")
-        val name=field(export,"Output filename","morphicName","Morphic Field",48,true)
-        if(name.text.isBlank())name.setText("Morphic Field")
-        action(export,"GENERATE & VERIFY FIELD WAV","primary"){
-            val blueprint=runCatching{currentBlueprint().validated()}.getOrElse{
-                Toast.makeText(this,it.message,Toast.LENGTH_LONG).show()
-                return@action
-            }
-            val seconds=MorphicFieldV3.minimumSeconds(blueprint)
-            if(seconds>selected*60){
-                Toast.makeText(this,"Select at least $seconds seconds, or use AUTO-FIT DURATION",Toast.LENGTH_LONG).show()
-                return@action
-            }
-            p.edit().putString("morphicObjective",blueprint.objective)
-                .putString("morphicInstructions",blueprint.instructions)
-                .putString("morphicText",blueprint.affirmations)
-                .putString("morphicName",name.text.toString()).apply()
-            startAction(RenderService.ACTION_MORPHIC)
+        val export=section(body,"05 — Generate and Verify Audio")
+        val name=field(export,"Output filename","morphicName","SubGen Auto Field",48,true)
+        if(name.text.isBlank())name.setText("SubGen Auto Field")
+        fun render(autoPlan:Boolean,autoFit:Boolean){
+            runCatching{
+                if(autoPlan || objective.text.isBlank() || instructions.text.isBlank() ||
+                    p.getString("morphicPreparedText","")!=affirmations.text.toString()){
+                    preparePlan()
+                }
+                val blueprint=currentBlueprint().validated()
+                val need=MorphicFieldV3.minimumSeconds(blueprint)
+                val minutes=if(autoFit){
+                    listOf(1,3,5,10,20,30,60).firstOrNull{it*60>=need}
+                        ?:error("This field requires more than 60 minutes")
+                } else selected
+                require(need<=minutes*60){
+                    "Field requires "+need+" seconds; select a longer duration or use ONE-TAP"
+                }
+                p.edit().putInt("morphicMinutes",minutes)
+                    .putString("morphicObjective",blueprint.objective)
+                    .putString("morphicInstructions",blueprint.instructions)
+                    .putString("morphicText",blueprint.affirmations)
+                    .putString("morphicName",name.text.toString()).commit()
+                startAction(RenderService.ACTION_MORPHIC)
+                planStatus.text="RENDER REQUESTED · "+minutes+" minute WAV · "+
+                    (if(autoPlan)"auto-generated specification" else "reviewed specification")
+            }.onFailure{Toast.makeText(this,it.message,Toast.LENGTH_LONG).show()}
         }
+        action(export,"ONE-TAP · ANALYZE + AUTO-FIT + GENERATE","primary"){render(true,true)}
+        action(export,"GENERATE USING REVIEWED FIELD INSTRUCTIONS"){render(false,false)}
         action(export,"STOP GENERATION"){startAction(RenderService.ACTION_CANCEL)}
-        morphicStatusText=txt(export,p.getString("morphic:status","Ready · written field blueprint encoder")?:"Ready",11f,green)
+        morphicStatusText=txt(export,p.getString("morphic:status","Ready · auto field builder V3.2")?:"Ready",11f,green)
         val hash=p.getString("morphicLastHash","").orEmpty()
         if(hash.isNotBlank()){
-            txt(export,"LAST VERIFIED SHA-256 · $hash",9f,cool,monoFont=true)
-            txt(export,"LAST OUTPUT · ${p.getString("morphicLastProfile","")} · ${p.getLong("morphicLastCycles",0)} complete cycles",10f,cool)
-            action(export,"▶ PLAY LAST FIELD WAV"){
+            txt(export,"LAST VERIFIED DATA SHA-256 · "+hash,9f,cool,monoFont=true)
+            txt(export,"LAST OUTPUT · "+p.getString("morphicLastProfile","")+
+                " · "+p.getLong("morphicLastCycles",0)+" complete data cycles",10f,cool)
+            action(export,"▶ PLAY LAST VERIFIED FIELD WAV"){
                 runCatching{
-                    val file=File(filesDir,"morphic-field-architecture-v3-working.wav")
-                    require(file.isFile&&file.length()>44){"Create the first field WAV"}
+                    val file=File(filesDir,"morphic-field-architecture-v32-working.wav")
+                    require(file.isFile&&file.length()>44){"Generate a field WAV first"}
                     MediaPlayer().apply{
                         setDataSource(file.absolutePath)
                         setOnCompletionListener{it.release()}
@@ -748,7 +781,7 @@ class MainActivity : Activity() {
                 }.onFailure{Toast.makeText(this,it.message,Toast.LENGTH_LONG).show()}
             }
         }
-        txt(export,"Verification checks the WAV, complete written inputs, architecture and computed convergence. Any effects beyond the generated recording require independent testing.",10f,cool)
+        txt(export,"Verification establishes accurate digital encoding, not an independently demonstrated influence on events outside the recording.",10f,cool)
     }
 
     private fun buildNeuro(){
