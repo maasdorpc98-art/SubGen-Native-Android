@@ -1,0 +1,110 @@
+name: SubGen Field Intelligence V3.3 - Full Android and Audio QA
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/subgen-v33-complete-field-builder-20261107]
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Android 35
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Preserve Studio, Hypnosis and Frequency Creator
+        run: |
+          python3 scripts/check-source.py
+          python3 scripts/check-studio-parity.py
+          python3 scripts/check-neuromodulation.py
+      - name: Audit adaptive UI controls, edit preservation, version and service integration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          k=Path("app/src/main/java/com/subgen/nativeapp")
+          s=(k/"MainActivity.kt").read_text()
+          m=s[s.index("    private fun buildMorphic(){"):s.index("    private fun buildNeuro(){")]
+          service=(k/"RenderService.kt").read_text()
+          config=Path("app/build.gradle.kts").read_text()
+          assert "INTELLIGENT FIELD BUILDER V3.3" in m
+          for phrase in ["ANALYZE & WRITE FIELD OBJECTIVE + INSTRUCTIONS",
+                         "VIEW DETECTED FUNCTIONS & SOURCE EXAMPLES",
+                         "COPY COMPLETE FIELD PLAN",
+                         "INSPECT MY SEVEN-NODE ARCHITECTURE",
+                         "ONE-TAP · ANALYZE + AUTO-FIT + GENERATE",
+                         "GENERATE USING REVIEWED FIELD INSTRUCTIONS",
+                         "REFRESH VERIFIED FILE STATUS",
+                         "COMPLETE WAV SHA-256"]:
+              assert phrase in m, phrase
+          assert "AdaptiveFieldComposer.compose(original)" in m
+          assert "AdaptiveFieldComposer.compose(affirmations)" in service
+          assert 'morphicPlanVersion","3.3"' in m
+          assert 'morphicPlanVersion","")!="3.3"' in service
+          assert 'morphic-field-architecture-v33-working.wav' in m
+          assert 'morphic-field-architecture-v33-working.wav' in service
+          assert "fieldintelligencev33" in config
+          assert "SubGen FIELD INTELLIGENCE V3.3" in config
+          assert 'versionCode = 22' in config
+          assert not any(x in m.lower() for x in ["fictional","fantasy","hypothetical","conceptual field"])
+          print("PASS: V3.3 UI controls, user edits, route integration, offline analyzer and unique Android identity")
+          PY
+      - name: Compile and execute deep source-grounded field tests
+        run: |
+          K=app/src/main/java/com/subgen/nativeapp
+          kotlinc "$K/ScriptParser.kt" "$K/WordPacing.kt" "$K/WavIO.kt" \
+            "$K/MorphicFieldV2.kt" "$K/FieldDynamics.kt" "$K/FieldArchitecture.kt" \
+            "$K/MorphicFieldV3.kt" "$K/AutoFieldComposer.kt" "$K/AdaptiveFieldComposer.kt" \
+            scripts/test_adaptive_field_v33.kt tests/stubs/*.kt \
+            -include-runtime -d /tmp/subgen-field-v33-tests.jar
+          java -Xmx4g -jar /tmp/subgen-field-v33-tests.jar
+      - name: Run original V3 and V3.2 waveform regression suites
+        run: |
+          K=app/src/main/java/com/subgen/nativeapp
+          kotlinc "$K/ScriptParser.kt" "$K/WordPacing.kt" "$K/WavIO.kt" \
+            "$K/MorphicFieldV2.kt" "$K/FieldDynamics.kt" "$K/FieldArchitecture.kt" \
+            "$K/MorphicFieldV3.kt" "$K/AutoFieldComposer.kt" \
+            scripts/test_auto_field_v32.kt tests/stubs/*.kt \
+            -include-runtime -d /tmp/subgen-v32-regression.jar
+          java -Xmx4g -jar /tmp/subgen-v32-regression.jar
+          kotlinc "$K/ScriptParser.kt" "$K/WordPacing.kt" "$K/WavIO.kt" \
+            "$K/MorphicFieldV2.kt" "$K/FieldDynamics.kt" "$K/FieldArchitecture.kt" \
+            "$K/MorphicFieldV3.kt" scripts/test_field_architecture_v3.kt tests/stubs/*.kt \
+            -include-runtime -d /tmp/subgen-v31-regression.jar
+          java -Xmx4g -jar /tmp/subgen-v31-regression.jar
+      - name: Prepare original arm64 audio runtime
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y bzip2 file
+          bash scripts/prepare-native-runtime.sh
+          bash scripts/check-runtime.sh
+      - name: Compile Android APK
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
+      - name: Verify signature, package identity and native runtime
+        run: |
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep "package: name='com.subgen.nativeapp.fourblocks.preview.fieldintelligencev33'"
+          unzip -l "$APK" | grep -q 'lib/arm64-v8a/libsherpa-onnx-jni.so'
+          sha256sum "$APK"
+      - name: Upload verified APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SubGen-Field-Intelligence-V33-Four-Sections-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
