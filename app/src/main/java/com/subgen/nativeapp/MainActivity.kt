@@ -575,11 +575,11 @@ class MainActivity : Activity() {
     /** Fourth audio section: a self-contained written-intention waveform experiment. */
     private fun buildMorphic(){
         val intro=panel(body,fill=Color.rgb(24,18,27),border=Color.rgb(130,36,54),padding=18)
-        txt(intro,"SUBGEN · AUTO FIELD BUILDER V3.2",20f,coral,true,tracking=.08f,gravity=Gravity.CENTER)
+        txt(intro,"SUBGEN · INTELLIGENT FIELD BUILDER V3.3",20f,coral,true,tracking=.08f,gravity=Gravity.CENTER)
         txt(intro,"AFFIRMATIONS → OBJECTIVE → INSTRUCTIONS → FIELD AUDIO",10f,cool,gravity=Gravity.CENTER)
         space(intro,8)
         txt(intro,"Paste your affirmations. The offline analyzer generates an editable field objective, operating instructions and seven-node architecture before rendering a verified WAV.",11f,bright)
-        txt(intro,"Version 3.2 · Offline rule-based analysis · All four SubGen sections preserved.",10f,cool)
+        txt(intro,"Version 3.3 · Source-grounded adaptive analysis · Four original SubGen sections retained.",10f,cool)
 
         fun field(parent:LinearLayout,title:String,key:String,hint:String,height:Int,single:Boolean=false):EditText{
             txt(parent,title.uppercase(),10f,cool,monoFont=true)
@@ -625,14 +625,19 @@ class MainActivity : Activity() {
         val instructions=field(design,"Field instructions · generated + editable","morphicInstructions",
             "SubGen will write the complete operating structure.",220)
         val planStatus=txt(design,"Ready to analyze the written set.",10f,cool)
-        fun preparePlan():AutoFieldComposer.Analysis{
+        val planWarnings=txt(design,"The generated plan will show source-coverage and review warnings.",10f,cool)
+        fun preparePlan():AdaptiveFieldComposer.Analysis{
             val original=affirmations.text.toString()
-            val result=AutoFieldComposer.compose(original)
+            val result=AdaptiveFieldComposer.compose(original)
             objective.setText(result.objective)
             instructions.setText(result.instructions)
             p.edit().putString("morphicPreparedText",original)
-                .putString("morphicAnalyzedTheme",result.theme).apply()
+                .putString("morphicAnalyzedTheme",result.theme)
+                .putString("morphicPreparedHash",result.fingerprint).apply()
             planStatus.text="PREPARED · "+result.details
+            planWarnings.text=if(result.warnings.isEmpty())
+                "SOURCE TRACE · "+result.coverage+" intent functions · no review flags"
+                else "REVIEW FLAGS · "+result.warnings.joinToString(" | ")
             return result
         }
         action(design,"ANALYZE & WRITE FIELD OBJECTIVE + INSTRUCTIONS","primary"){
@@ -640,7 +645,41 @@ class MainActivity : Activity() {
                 Toast.makeText(this,it.message,Toast.LENGTH_LONG).show()
             }
         }
-        txt(design,"Analysis is local and deterministic, not an AI language model. Check the inferred meaning before final use.",10f,cool)
+        action(design,"VIEW DETECTED FUNCTIONS & SOURCE EXAMPLES"){
+            runCatching{
+                val result=AdaptiveFieldComposer.compose(affirmations.text.toString())
+                val summary=buildString{
+                    append("THEME: ").append(result.theme).append("\n")
+                    append("LINES: ").append(result.observedLines)
+                        .append(" · COVERAGE: ").append(result.coverage).append(" / 15\n\n")
+                    result.features.forEach{ f->
+                        append(f.name.uppercase()).append(" (").append(f.count)
+                            .append(" matching lines)\n")
+                        append("Operation: ").append(f.operation).append("\n")
+                        append("Source: ").append(f.example).append("\n\n")
+                    }
+                    if(result.warnings.isNotEmpty())append("REVIEW:\n")
+                        .append(result.warnings.joinToString("\n"))
+                }
+                AlertDialog.Builder(this).setTitle("SOURCE-GROUNDED INTENT ANALYSIS")
+                    .setMessage(summary).setPositiveButton("CLOSE",null).show()
+            }.onFailure{Toast.makeText(this,it.message,Toast.LENGTH_LONG).show()}
+        }
+        action(design,"COPY COMPLETE FIELD PLAN"){
+            runCatching{
+                val plan="FIELD OBJECTIVE\n"+objective.text.toString()+
+                    "\n\nFIELD INSTRUCTIONS\n"+instructions.text.toString()
+                require(objective.text.isNotBlank()&&instructions.text.isNotBlank()){
+                    "Generate the field plan before copying"
+                }
+                val clip=android.content.ClipData.newPlainText("SubGen Field Plan",plan)
+                val clipboard=getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                    as android.content.ClipboardManager
+                clipboard.setPrimaryClip(clip)
+                Toast.makeText(this,"Field plan copied",Toast.LENGTH_SHORT).show()
+            }.onFailure{Toast.makeText(this,it.message,Toast.LENGTH_LONG).show()}
+        }
+        txt(design,"The analysis is offline and rule-based. It is source-grounded, but ambiguous or unfamiliar intentions still require your review.",10f,cool)
 
         val structure=section(body,"03 — Field Architecture Inspector")
         txt(structure,"IDENTITY · ATTRACTOR · INTERPRETATION · PATHWAYS · COHERENCE · RESONANCE · MEMORY",11f,bright)
@@ -660,7 +699,15 @@ class MainActivity : Activity() {
                             .append("\n").append(node.description)
                             .append("\nSource matches: ").append(node.evidence).append("\n\n")
                     }
-                    append("ATTRACTOR CONVERGENCE\n")
+                    val interpretation=AdaptiveFieldComposer.compose(affirmations.text.toString())
+                    append("SOURCE FUNCTIONS\n")
+                    interpretation.features.take(12).forEach{feature->
+                        append(feature.name).append(" · ").append(feature.count)
+                            .append(" matches\n")
+                    }
+                    if(interpretation.warnings.isNotEmpty())append("REVIEW FLAGS: ")
+                        .append(interpretation.warnings.joinToString("; ")).append("\n")
+                    append("\nATTRACTOR CONVERGENCE\n")
                     append("Converged: ").append(plan.dynamics.converged)
                         .append(" · Iterations: ").append(plan.dynamics.steps).append("\n")
                     append("Distance: ")
@@ -678,7 +725,7 @@ class MainActivity : Activity() {
                         append(edge.from.title).append(" → ").append(edge.to.title).append("\n")
                     }
                 }
-                AlertDialog.Builder(this).setTitle("FIELD ARCHITECTURE · V3.2")
+                AlertDialog.Builder(this).setTitle("FIELD ARCHITECTURE · V3.3")
                     .setMessage(summary).setPositiveButton("CLOSE",null).show()
             }.onFailure{Toast.makeText(this,it.message,Toast.LENGTH_LONG).show()}
         }
@@ -733,8 +780,8 @@ class MainActivity : Activity() {
         }
 
         val export=section(body,"05 — Generate and Verify Audio")
-        val name=field(export,"Output filename","morphicName","SubGen Auto Field",48,true)
-        if(name.text.isBlank())name.setText("SubGen Auto Field")
+        val name=field(export,"Output filename","morphicName","SubGen Auto Field V3.3",48,true)
+        if(name.text.isBlank())name.setText("SubGen Auto Field V3.3")
         fun render(autoPlan:Boolean,autoFit:Boolean){
             runCatching{
                 if(autoPlan || objective.text.isBlank() || instructions.text.isBlank() ||
@@ -763,7 +810,7 @@ class MainActivity : Activity() {
         action(export,"ONE-TAP · ANALYZE + AUTO-FIT + GENERATE","primary"){render(true,true)}
         action(export,"GENERATE USING REVIEWED FIELD INSTRUCTIONS"){render(false,false)}
         action(export,"STOP GENERATION"){startAction(RenderService.ACTION_CANCEL)}
-        morphicStatusText=txt(export,p.getString("morphic:status","Ready · auto field builder V3.2")?:"Ready",11f,green)
+        morphicStatusText=txt(export,p.getString("morphic:status","Ready · field builder V3.3")?:"Ready",11f,green)
         val hash=p.getString("morphicLastHash","").orEmpty()
         if(hash.isNotBlank()){
             txt(export,"LAST VERIFIED DATA SHA-256 · "+hash,9f,cool,monoFont=true)
@@ -771,7 +818,7 @@ class MainActivity : Activity() {
                 " · "+p.getLong("morphicLastCycles",0)+" complete data cycles",10f,cool)
             action(export,"▶ PLAY LAST VERIFIED FIELD WAV"){
                 runCatching{
-                    val file=File(filesDir,"morphic-field-architecture-v32-working.wav")
+                    val file=File(filesDir,"morphic-field-architecture-v33-working.wav")
                     require(file.isFile&&file.length()>44){"Generate a field WAV first"}
                     MediaPlayer().apply{
                         setDataSource(file.absolutePath)
@@ -781,7 +828,8 @@ class MainActivity : Activity() {
                 }.onFailure{Toast.makeText(this,it.message,Toast.LENGTH_LONG).show()}
             }
         }
-        txt(export,"Verification establishes accurate digital encoding, not an independently demonstrated influence on events outside the recording.",10f,cool)
+        action(export,"REFRESH VERIFIED FILE STATUS"){showTab("morphic")}
+        txt(export,"Digital verification checks the exact source, field plan, all complete encoding cycles, and the WAV container. Effects beyond the recording require independent evidence.",10f,cool)
     }
 
     private fun buildNeuro(){
