@@ -1,0 +1,94 @@
+name: SubGen Auto Field Builder V3.2 - Verified Android APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/subgen-v32-auto-field-builder-20261107]
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout corrected native Android source
+        uses: actions/checkout@v4
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Android 35
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Preserve Studio, Hypnosis and Frequency Creator
+        run: |
+          python3 scripts/check-source.py
+          python3 scripts/check-studio-parity.py
+          python3 scripts/check-neuromodulation.py
+      - name: Check new complete user workflow and distinctive app identity
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('app/src/main/java/com/subgen/nativeapp')
+          s=(root/'MainActivity.kt').read_text()
+          m=s[s.index('    private fun buildMorphic(){'):s.index('    private fun buildNeuro(){')]
+          assert 'SUBGEN · AUTO FIELD BUILDER V3.2' in m
+          assert 'AFFIRMATIONS → OBJECTIVE → INSTRUCTIONS → FIELD AUDIO' in m
+          assert 'ANALYZE & WRITE FIELD OBJECTIVE + INSTRUCTIONS' in m
+          assert 'ONE-TAP · ANALYZE + AUTO-FIT + GENERATE' in m
+          assert 'preparePlan()' in m and 'startAction(RenderService.ACTION_MORPHIC)' in m
+          assert 'INSPECT MY SEVEN-NODE ARCHITECTURE' in m
+          assert not any(x in m.lower() for x in ['fictional','fantasy','hypothetical','conceptual field'])
+          service=(root/'RenderService.kt').read_text()
+          assert 'AutoFieldComposer.compose(affirmations)' in service
+          assert 'morphic-field-architecture-v32-working.wav' in service
+          build=Path('app/build.gradle.kts').read_text()
+          assert '.autofieldv32' in build
+          assert 'SubGen AUTO FIELD V3.2' in build
+          print('PASS: v3.2 direct language, offline auto plan, one-tap render, inspector and unique identity')
+          PY
+      - name: Compile & verify V3.2 automatic-field pipeline using user affirmations
+        run: |
+          K=app/src/main/java/com/subgen/nativeapp
+          kotlinc "$K/ScriptParser.kt" "$K/WordPacing.kt" "$K/WavIO.kt" \
+            "$K/MorphicFieldV2.kt" "$K/FieldDynamics.kt" "$K/FieldArchitecture.kt" \
+            "$K/MorphicFieldV3.kt" "$K/AutoFieldComposer.kt" scripts/test_auto_field_v32.kt \
+            tests/stubs/*.kt -include-runtime -d /tmp/subgen-auto-field-v32-tests.jar
+          java -Xmx3g -jar /tmp/subgen-auto-field-v32-tests.jar
+      - name: Verify existing field dynamics and waveform regression tests
+        run: |
+          K=app/src/main/java/com/subgen/nativeapp
+          kotlinc "$K/ScriptParser.kt" "$K/WordPacing.kt" "$K/WavIO.kt" \
+            "$K/MorphicFieldV2.kt" "$K/FieldDynamics.kt" "$K/FieldArchitecture.kt" \
+            "$K/MorphicFieldV3.kt" scripts/test_field_architecture_v3.kt \
+            tests/stubs/*.kt -include-runtime -d /tmp/subgen-field-regression.jar
+          java -Xmx3g -jar /tmp/subgen-field-regression.jar
+      - name: Prepare offline audio runtime
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y bzip2 file
+          bash scripts/prepare-native-runtime.sh
+          bash scripts/check-runtime.sh
+      - name: Compile Android application
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
+      - name: Verify real APK identity, signature and native audio runtime
+        run: |
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep "package: name='com.subgen.nativeapp.fourblocks.preview.autofieldv32'"
+          unzip -l "$APK" | grep -q 'lib/arm64-v8a/libsherpa-onnx-jni.so'
+          sha256sum "$APK"
+      - name: Upload verified four-section Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SubGen-AUTO-FIELD-V3.2-Android-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
