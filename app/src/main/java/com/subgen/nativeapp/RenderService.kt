@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.os.SystemClock
+import java.io.FileInputStream
 import java.io.File
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
@@ -136,21 +137,24 @@ class RenderService:Service() {
         update("BEST: ${best.first} threads · ${p.getString("benchmark","")}")
     }
     private fun runMorphic(){
-        Diagnostics.stage("AUTO_FIELD_BUILDER_V32_PREPARE")
+        Diagnostics.stage("ADAPTIVE_FIELD_BUILDER_V33_PREPARE")
         val p=renderSettings?:PreferenceSnapshot(StateStore.prefs(this))
         val live=StateStore.prefs(this)
         val affirmations=p.getString("morphicText","").orEmpty()
         var objective=p.getString("morphicObjective","").orEmpty()
         var instructions=p.getString("morphicInstructions","").orEmpty()
         if(objective.isBlank()||instructions.isBlank()||
-            p.getString("morphicPreparedText","")!=affirmations){
-            val plan=AutoFieldComposer.compose(affirmations)
+            p.getString("morphicPreparedText","")!=affirmations ||
+            p.getString("morphicPlanVersion","")!="3.3"){
+            val plan=AdaptiveFieldComposer.compose(affirmations)
             objective=plan.objective
             instructions=plan.instructions
             live.edit().putString("morphicObjective",objective)
                 .putString("morphicInstructions",instructions)
                 .putString("morphicPreparedText",affirmations)
-                .putString("morphicAnalyzedTheme",plan.theme).commit()
+                .putString("morphicAnalyzedTheme",plan.theme)
+                .putString("morphicPlanVersion","3.3")
+                .putString("morphicPreparedHash",plan.fingerprint).commit()
         }
         val blueprint=MorphicFieldV3.Blueprint(objective,instructions,affirmations).validated()
         val minutes=p.getInt("morphicMinutes",5).coerceIn(1,60)
@@ -159,12 +163,12 @@ class RenderService:Service() {
         val profile=if(p.getString("morphicProfile","ambient")=="signal")
             MorphicFieldV3.Profile.SIGNAL else MorphicFieldV3.Profile.AMBIENT
         val name=p.getString("morphicName","SubGen Auto Field")?:"SubGen Auto Field"
-        val output=File(filesDir,"morphic-field-architecture-v32-working.wav")
+        val output=File(filesDir,"morphic-field-architecture-v33-working.wav")
         fun status(message:String){
             live.edit().putString("morphic:status",message).apply()
             update(message)
         }
-        status("Building complete seven-node field plan from written intentions…")
+        status("Building adaptive seven-node field architecture from written intentions…")
         val result=MorphicFieldV3.render(blueprint,minutes,profile,output,::status){cancelled.get()}
         if(cancelled.get())throw InterruptedException("Field render cancelled")
         status("Decoding the saved WAV samples and verifying the entire architecture…")
@@ -176,12 +180,25 @@ class RenderService:Service() {
         if(cancelled.get())throw InterruptedException("Field render cancelled before export")
         status("Exporting verified WAV to Downloads/SubGen…")
         val uri=WavIO.saveToDownloads(this,output,name)
-        live.edit().putString("morphicLastUri",uri.toString())
+        // File-level fingerprint supplements packet-level verification. It
+        // identifies all PCM samples, including the residual ambient tail.
+        val fileDigest=java.security.MessageDigest.getInstance("SHA-256")
+        FileInputStream(output).buffered(65536).use { stream ->
+            val buffer=ByteArray(65536)
+            while(true){
+                val n=stream.read(buffer)
+                if(n<0)break
+                if(n>0)fileDigest.update(buffer,0,n)
+            }
+        }
+        val wavFingerprint=fileDigest.digest().joinToString(""){"%02x".format(it)}
+        live.edit().putString("morphicLastFileHash",wavFingerprint)
+            .putString("morphicLastUri",uri.toString())
             .putString("morphicLastHash",verified.sha256)
             .putString("morphicLastArchitecture",verified.architecture)
             .putString("morphicLastProfile",profile.label)
             .putLong("morphicLastCycles",verified.completeCycles).apply()
-        status("SAVED · AUTO FIELD V3.2 · "+profile.label.uppercase()+
+        status("SAVED · ADAPTIVE FIELD V3.3 · "+profile.label.uppercase()+
             " WAV · verified · "+verified.completeCycles+" complete cycles")
     }
     private fun runSubliminal(){
