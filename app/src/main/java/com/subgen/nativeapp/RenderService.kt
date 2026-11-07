@@ -136,41 +136,53 @@ class RenderService:Service() {
         update("BEST: ${best.first} threads · ${p.getString("benchmark","")}")
     }
     private fun runMorphic(){
-        Diagnostics.stage("FIELD_ARCHITECTURE_V3_PREPARE")
+        Diagnostics.stage("AUTO_FIELD_BUILDER_V32_PREPARE")
         val p=renderSettings?:PreferenceSnapshot(StateStore.prefs(this))
         val live=StateStore.prefs(this)
-        val blueprint=MorphicFieldV3.Blueprint(
-            p.getString("morphicObjective","").orEmpty(),
-            p.getString("morphicInstructions","").orEmpty(),
-            p.getString("morphicText","").orEmpty()
-        ).validated()
+        val affirmations=p.getString("morphicText","").orEmpty()
+        var objective=p.getString("morphicObjective","").orEmpty()
+        var instructions=p.getString("morphicInstructions","").orEmpty()
+        if(objective.isBlank()||instructions.isBlank()||
+            p.getString("morphicPreparedText","")!=affirmations){
+            val plan=AutoFieldComposer.compose(affirmations)
+            objective=plan.objective
+            instructions=plan.instructions
+            live.edit().putString("morphicObjective",objective)
+                .putString("morphicInstructions",instructions)
+                .putString("morphicPreparedText",affirmations)
+                .putString("morphicAnalyzedTheme",plan.theme).commit()
+        }
+        val blueprint=MorphicFieldV3.Blueprint(objective,instructions,affirmations).validated()
         val minutes=p.getInt("morphicMinutes",5).coerceIn(1,60)
+        val required=MorphicFieldV3.minimumSeconds(blueprint)
+        require(required<=minutes*60){"Field requires "+required+" seconds. Select AUTO-FIT or use ONE-TAP."}
         val profile=if(p.getString("morphicProfile","ambient")=="signal")
             MorphicFieldV3.Profile.SIGNAL else MorphicFieldV3.Profile.AMBIENT
-        val name=p.getString("morphicName","Field Architecture")?:"Field Architecture"
-        val output=File(filesDir,"morphic-field-architecture-v3-working.wav")
+        val name=p.getString("morphicName","SubGen Auto Field")?:"SubGen Auto Field"
+        val output=File(filesDir,"morphic-field-architecture-v32-working.wav")
         fun status(message:String){
             live.edit().putString("morphic:status",message).apply()
             update(message)
         }
-        status("Building seven-node field architecture…")
+        status("Building complete seven-node field plan from written intentions…")
         val result=MorphicFieldV3.render(blueprint,minutes,profile,output,::status){cancelled.get()}
-        if(cancelled.get())throw InterruptedException("Field architecture render cancelled")
-        status("Decoding the finished WAV and validating the complete architecture…")
+        if(cancelled.get())throw InterruptedException("Field render cancelled")
+        status("Decoding the saved WAV samples and verifying the entire architecture…")
         val verified=MorphicFieldV3.verify(output)
         require(verified.blueprint==blueprint && verified.profile==profile &&
             verified.sha256==result.sha256 && verified.architecture==result.architecture){
-            "Field architecture audio verification failed"
+            "The encoded field plan could not be verified"
         }
-        if(cancelled.get())throw InterruptedException("Field architecture render cancelled before export")
-        status("Saving verified WAV to Downloads/SubGen…")
+        if(cancelled.get())throw InterruptedException("Field render cancelled before export")
+        status("Exporting verified WAV to Downloads/SubGen…")
         val uri=WavIO.saveToDownloads(this,output,name)
         live.edit().putString("morphicLastUri",uri.toString())
             .putString("morphicLastHash",verified.sha256)
             .putString("morphicLastArchitecture",verified.architecture)
             .putString("morphicLastProfile",profile.label)
             .putLong("morphicLastCycles",verified.completeCycles).apply()
-        status("SAVED · FIELD ARCHITECTURE V3 · ${profile.label.uppercase()} · verified · ${verified.completeCycles} cycles")
+        status("SAVED · AUTO FIELD V3.2 · "+profile.label.uppercase()+
+            " WAV · verified · "+verified.completeCycles+" complete cycles")
     }
     private fun runSubliminal(){
         Diagnostics.stage("SUBLIMINAL_PREPARE")
