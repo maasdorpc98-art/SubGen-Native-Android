@@ -13,7 +13,7 @@ android {
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     buildTypes {
-        debug { applicationIdSuffix = ".fieldlabv2"; versionNameSuffix = "-fieldlabv2"; manifestPlaceholders["appLabel"] = "SubGen Field Lab v2" }
+        debug { applicationIdSuffix = ".fieldarchv3"; versionNameSuffix = "-fieldarchv3"; manifestPlaceholders["appLabel"] = "SubGen Field Architecture v3" }
         release { isMinifyEnabled = false }
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
