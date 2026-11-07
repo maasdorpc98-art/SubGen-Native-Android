@@ -575,10 +575,10 @@ class MainActivity : Activity() {
     /** Fourth audio section: a self-contained written-intention waveform experiment. */
     private fun buildMorphic(){
         val intro=panel(body,fill=Color.rgb(24,18,27),border=Color.rgb(130,36,54),padding=18)
-        txt(intro,"MORPHIC FIELD LAB · V2",21f,coral,true,tracking=.11f,gravity=Gravity.CENTER)
-        txt(intro,"FIELD CONCEPT + WRITTEN AFFIRMATIONS → AUDIO",10f,cool,gravity=Gravity.CENTER)
+        txt(intro,"FIELD ARCHITECTURE · V3",21f,coral,true,tracking=.11f,gravity=Gravity.CENTER)
+        txt(intro,"SEVEN-LAYER INFORMATION MODEL + RECOVERABLE AUDIO",10f,cool,gravity=Gravity.CENTER)
         space(intro,8)
-        txt(intro,"The complete written blueprint is encoded in the actual waveform, then decoded and SHA-256 verified. This is an experimental method, not proof of energetic field creation.",10f,cool)
+        txt(intro,"Builds a seven-node conceptual field architecture from your exact written inputs, encodes it into the waveform and verifies its recovery. This is an experimental model, not evidence of a physical morphic field.",10f,cool)
 
         fun field(parent:LinearLayout,title:String,key:String,hint:String,height:Int,single:Boolean=false):EditText{
             txt(parent,title.uppercase(),10f,cool,monoFont=true)
@@ -624,7 +624,31 @@ class MainActivity : Activity() {
         }
         txt(source,"Every line and punctuation mark is retained as UTF-8 text inside the waveform.",10f,cool)
 
-        val settings=section(body,"03 — Sound & Duration")
+        val structure=section(body,"03 — Field Architecture")
+        txt(structure,"SEVEN INTERCONNECTED COMPONENTS",10f,cool,monoFont=true)
+        txt(structure,"Identity · Attractor · Interpretation · Pathways · Coherence · Resonance Model · Memory",11f,bright)
+        txt(structure,"The relationship graph is generated deterministically from the original text. The sound carries the complete graph, not just its title.",10f,cool)
+        action(structure,"INSPECT ARCHITECTURE & CONNECTIONS"){
+            runCatching {
+                val plan=FieldArchitecture.create(MorphicFieldV2.Blueprint(
+                    objective.text.toString(),instructions.text.toString(),affirmations.text.toString()))
+                val summary=buildString {
+                    append("FIELD ID: ").append(plan.fieldId).append("\n")
+                    append("Affirmations: ").append(plan.lines).append("\n\n")
+                    plan.nodes.forEachIndexed { idx,node->
+                        append(idx+1).append(". ").append(node.kind.title.uppercase())
+                            .append("\n").append(node.description)
+                            .append("\nSource matches: ").append(node.evidence).append("\n\n")
+                    }
+                    append("CONNECTIONS\n")
+                    plan.edges.forEach{append(it.from.title).append(" → ")
+                        .append(it.to.title).append("\n")}
+                }
+                AlertDialog.Builder(this).setTitle("FIELD ARCHITECTURE · V3")
+                    .setMessage(summary).setPositiveButton("CLOSE",null).show()
+            }.onFailure { Toast.makeText(this,it.message,Toast.LENGTH_LONG).show() }
+        }
+        val settings=section(body,"04 — Sound & Duration")
         txt(settings,"AUDIO PROFILE",10f,cool,monoFont=true)
         val selectedProfile=p.getString("morphicProfile","ambient")?:"ambient"
         action(settings,(if(selectedProfile=="ambient")"● " else "○ ")+"AMBIENT · STEREO SOUNDSCAPE"){
@@ -652,18 +676,18 @@ class MainActivity : Activity() {
             timeRow.addView(view,LinearLayout.LayoutParams(0,-2,1f).apply{marginEnd=d(3)})
         }
         val capacity=txt(settings,"One complete field blueprint must fit within the duration.",10f,cool)
-        fun currentBlueprint()=MorphicFieldV2.Blueprint(
+        fun currentBlueprint()=MorphicFieldV3.Blueprint(
             objective.text.toString(),instructions.text.toString(),affirmations.text.toString())
         fun showCapacity(){
             capacity.text=runCatching {
-                val seconds=MorphicFieldV2.minimumSeconds(currentBlueprint())
+                val seconds=MorphicFieldV3.minimumSeconds(currentBlueprint())
                 val cycles=(selected*60)/seconds.coerceAtLeast(1)
                 "Required: $seconds seconds minimum · complete cycles within selected duration: $cycles"
             }.getOrElse{"Enter affirmations to estimate required encoding time."}
         }
         showCapacity()
         action(settings,"AUTO-FIT DURATION"){
-            val seconds=runCatching{MorphicFieldV2.minimumSeconds(currentBlueprint())}
+            val seconds=runCatching{MorphicFieldV3.minimumSeconds(currentBlueprint())}
                 .getOrElse{Toast.makeText(this,it.message,Toast.LENGTH_LONG).show();return@action}
             val fit=listOf(1,3,5,10,20,30,60).firstOrNull{it*60>=seconds}
             if(fit==null){
@@ -673,7 +697,7 @@ class MainActivity : Activity() {
             p.edit().putInt("morphicMinutes",fit).apply();showTab("morphic")
         }
 
-        val export=section(body,"04 — Render, Verify & Export")
+        val export=section(body,"05 — Render, Verify & Export")
         val name=field(export,"Output filename","morphicName","Morphic Field",48,true)
         if(name.text.isBlank())name.setText("Morphic Field")
         action(export,"GENERATE & VERIFY FIELD WAV","primary"){
@@ -681,7 +705,7 @@ class MainActivity : Activity() {
                 Toast.makeText(this,it.message,Toast.LENGTH_LONG).show()
                 return@action
             }
-            val seconds=MorphicFieldV2.minimumSeconds(blueprint)
+            val seconds=MorphicFieldV3.minimumSeconds(blueprint)
             if(seconds>selected*60){
                 Toast.makeText(this,"Select at least $seconds seconds, or use AUTO-FIT DURATION",Toast.LENGTH_LONG).show()
                 return@action
@@ -700,7 +724,7 @@ class MainActivity : Activity() {
             txt(export,"LAST OUTPUT · ${p.getString("morphicLastProfile","")} · ${p.getLong("morphicLastCycles",0)} complete cycles",10f,cool)
             action(export,"▶ PLAY LAST FIELD WAV"){
                 runCatching{
-                    val file=File(filesDir,"morphic-field-lab-v2-working.wav")
+                    val file=File(filesDir,"morphic-field-architecture-v3-working.wav")
                     require(file.isFile&&file.length()>44){"Create the first field WAV"}
                     MediaPlayer().apply{
                         setDataSource(file.absolutePath)
@@ -710,7 +734,7 @@ class MainActivity : Activity() {
                 }.onFailure{Toast.makeText(this,it.message,Toast.LENGTH_LONG).show()}
             }
         }
-        txt(export,"This verifies the digital recording and text content. The claimed energetic field remains unverified.",10f,cool)
+        txt(export,"All three source inputs and the seven-node architecture are independently recovered from the WAV. A verified information model is not proof of reality-altering effects.",10f,cool)
     }
 
     private fun buildNeuro(){
