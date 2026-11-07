@@ -17,7 +17,17 @@ fun main() {
     check(a.nodes.map{it.kind}==FieldArchitecture.Kind.values().toList())
     check(a.source==source)
     check(a.nodes.first().description.contains(a.fieldId))
-    check(a.canonical().contains("status=EXPERIMENTAL_INFORMATION_MODEL_NOT_VERIFIED_FIELD"))
+    check(a.canonical().contains("status=FIELD_ARCHITECTURE_V31_INFORMATION_SPECIFICATION"))
+    check(a.dynamics.converged && a.dynamics.finalEnergy < 1e-6) {
+        "Attractor did not converge"
+    }
+    check(a.dynamics.finalEnergy<a.dynamics.initialEnergy)
+    check(a.canonical().contains("DYNAMICS|SEVEN_DIMENSIONAL_CONTRACTIVE_ATTRACTOR|V1"))
+    check(a.dynamics.lines.size == source.affirmations.lines().count { it.isNotBlank() })
+    check(a.dynamics.target.size == 7)
+    val different=FieldArchitecture.create(source.copy(
+        affirmations=source.affirmations.replace("understand","manifest")))
+    check(a.dynamics.target != different.dynamics.target){"Meaning-relevant change did not affect attractor"}
     check(a.canonical().contains("->"))
     check(a.fieldId!=FieldArchitecture.create(source.copy(affirmations=source.affirmations+"!")).fieldId)
     check(a.nodes.first{it.kind==FieldArchitecture.Kind.INTERPRETATION}.evidence>0)
@@ -58,6 +68,6 @@ fun main() {
         check(runCatching{MorphicFieldV3.render(
             blueprint,minutes,MorphicFieldV3.Profile.SIGNAL,tampered,stop={true}
         )}.isFailure){"Cancellation ignored"}
-        println("PASS: Field Architecture V3 · seven nodes/edges · exact source retention · signal + stereo audio roundtrip · SHA · integrity")
+        println("PASS: Field Architecture V3.1 · convergent attractor · seven nodes/edges · exact source retention · signal + stereo audio roundtrip · SHA · integrity")
     } finally {listOf(mono,stereo,tampered).forEach{it.delete()}}
 }
