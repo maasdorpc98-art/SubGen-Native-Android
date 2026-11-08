@@ -1,0 +1,98 @@
+name: SubGen Morphic Carrier V3.4 - Android + Verified Mixed Audio
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/subgen-v34-morphic-carrier-volume-20261108]
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout full four-section source
+        uses: actions/checkout@v4
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Android 35
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Verify all original Studio, Hypnosis and Frequency Creator systems
+        run: |
+          python3 scripts/check-source.py
+          python3 scripts/check-studio-parity.py
+          python3 scripts/check-neuromodulation.py
+      - name: Inspect carrier import and independent volume UI
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path('app/src/main/java/com/subgen/nativeapp')
+          ui=(src/'MainActivity.kt').read_text()
+          morphic=ui[ui.index('    private fun buildMorphic(){'):ui.index('    private fun buildNeuro(){')]
+          for phrase in ['FIELD INTELLIGENCE V3.4','IMPORT CARRIER AUDIO',
+                         'morphicCarrierEnabled','morphicCarrierPath',
+                         'MORPHIC SIGNAL','CARRIER AUDIO','MASTER OUTPUT',
+                         'morphicCarrierVolume','morphicMasterVolume','morphicVolume',
+                         'morphic-field-architecture-v34-working.wav']:
+              assert phrase in morphic,phrase
+          assert '961->' in ui and 'MorphicCarrierImport.`import`(' in ui
+          backend=(src/'RenderService.kt').read_text()
+          assert 'MorphicCarrierMixer.mix(' in backend
+          assert 'MorphicFieldV3.verify(finalStage,gain,carrier)' in backend
+          assert 'morphic-field-architecture-v34-working.wav' in backend
+          config=Path('app/build.gradle.kts').read_text()
+          assert '.morphiccarrierv34' in config
+          assert 'SubGen MORPHIC CARRIER V3.4' in config
+          print('PASS: import, enable/disable, 3 volume sliders, final mixed WAV verification, V3.4 identity')
+          PY
+      - name: Test actual carrier mixer and mixed digital waveform verification
+        run: |
+          K=app/src/main/java/com/subgen/nativeapp
+          kotlinc "$K/ScriptParser.kt" "$K/WordPacing.kt" "$K/WavIO.kt" \
+            "$K/MorphicFieldV2.kt" "$K/FieldDynamics.kt" "$K/FieldArchitecture.kt" \
+            "$K/MorphicFieldV3.kt" "$K/MorphicCarrierMixer.kt" \
+            scripts/test_morphic_carrier_v34.kt tests/stubs/*.kt \
+            -include-runtime -d /tmp/subgen-carrier-v34-tests.jar
+          java -Xmx3g -jar /tmp/subgen-carrier-v34-tests.jar
+      - name: Run V3.3 field-builder backwards compatibility regression
+        run: |
+          K=app/src/main/java/com/subgen/nativeapp
+          kotlinc "$K/ScriptParser.kt" "$K/WordPacing.kt" "$K/WavIO.kt" \
+            "$K/MorphicFieldV2.kt" "$K/FieldDynamics.kt" "$K/FieldArchitecture.kt" \
+            "$K/MorphicFieldV3.kt" "$K/MorphicCarrierMixer.kt" \
+            "$K/AutoFieldComposer.kt" "$K/AdaptiveFieldComposer.kt" \
+            scripts/test_adaptive_field_v33.kt tests/stubs/*.kt \
+            -include-runtime -d /tmp/subgen-v33-compat.jar
+          java -Xmx3g -jar /tmp/subgen-v33-compat.jar
+      - name: Prepare original native audio runtimes
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y bzip2 file
+          bash scripts/prepare-native-runtime.sh
+          bash scripts/check-runtime.sh
+      - name: Compile full four-section Android APK
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
+      - name: Check signing, package and native libraries
+        run: |
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep "package: name='com.subgen.nativeapp.fourblocks.preview.morphiccarrierv34'"
+          unzip -l "$APK" | grep -q 'lib/arm64-v8a/libsherpa-onnx-jni.so'
+          sha256sum "$APK"
+      - name: Upload signed V3.4 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SubGen-Morphic-Carrier-V34-Four-Sections-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
