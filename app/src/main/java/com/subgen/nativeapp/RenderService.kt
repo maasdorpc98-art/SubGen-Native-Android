@@ -137,7 +137,7 @@ class RenderService:Service() {
         update("BEST: ${best.first} threads · ${p.getString("benchmark","")}")
     }
     private fun runMorphic(){
-        Diagnostics.stage("ADAPTIVE_FIELD_BUILDER_V33_PREPARE")
+        Diagnostics.stage("MORPHIC_CARRIER_V34_PREPARE")
         val p=renderSettings?:PreferenceSnapshot(StateStore.prefs(this))
         val live=StateStore.prefs(this)
         val affirmations=p.getString("morphicText","").orEmpty()
@@ -159,47 +159,118 @@ class RenderService:Service() {
         val blueprint=MorphicFieldV3.Blueprint(objective,instructions,affirmations).validated()
         val minutes=p.getInt("morphicMinutes",5).coerceIn(1,60)
         val required=MorphicFieldV3.minimumSeconds(blueprint)
-        require(required<=minutes*60){"Field requires "+required+" seconds. Select AUTO-FIT or use ONE-TAP."}
+        require(required<=minutes*60){
+            "Field requires "+required+" seconds. Use AUTO-FIT or ONE-TAP."
+        }
         val profile=if(p.getString("morphicProfile","ambient")=="signal")
             MorphicFieldV3.Profile.SIGNAL else MorphicFieldV3.Profile.AMBIENT
-        val name=p.getString("morphicName","SubGen Auto Field")?:"SubGen Auto Field"
-        val output=File(filesDir,"morphic-field-architecture-v33-working.wav")
+        val isCarrierEnabled=p.getBoolean("morphicCarrierEnabled",false)
+        val carrier=if(isCarrierEnabled){
+            val path=p.getString("morphicCarrierPath","").orEmpty()
+            require(path.isNotBlank()){"Carrier enabled but no audio file has been imported"}
+            val file=File(path)
+            MorphicCarrierMixer.readHeader(file)
+            file
+        }else null
+        require(carrier==null||profile==MorphicFieldV3.Profile.AMBIENT){
+            "Carrier audio requires AMBIENT STEREO. Change profile and retry."
+        }
+        val gain=MorphicCarrierMixer.Gain(
+            morphic=p.getInt("morphicVolume",100).coerceIn(5,100),
+            carrier=p.getInt("morphicCarrierVolume",65).coerceIn(0,100),
+            master=p.getInt("morphicMasterVolume",80).coerceIn(5,100)
+        )
+        val needsMix=carrier!=null || gain.morphic!=100 || gain.master!=100
+        val expectedBytes=44L+minutes.toLong()*60L*MorphicFieldV3.RATE*profile.channels*2
+        val workingBytes=expectedBytes*(if(needsMix)2 else 1)+32L*1024*1024
+        require(android.os.StatFs(filesDir.absolutePath).availableBytes>workingBytes){
+            "Not enough phone storage for the audio render and carrier mix; free at least "+
+                ((workingBytes+1024*1024-1)/(1024*1024))+" MB"
+        }
+        val name=p.getString("morphicName","SubGen Carrier Field V3.4")
+            ?:"SubGen Carrier Field V3.4"
+        val base=File(filesDir,"morphic-field-v34-source.partial.wav")
+        val mixed=File(filesDir,"morphic-field-v34-mixed.partial.wav")
+        val output=File(filesDir,"morphic-field-architecture-v34-working.wav")
         fun status(message:String){
             live.edit().putString("morphic:status",message).apply()
             update(message)
         }
-        status("Building adaptive seven-node field architecture from written intentions…")
-        val result=MorphicFieldV3.render(blueprint,minutes,profile,output,::status){cancelled.get()}
-        if(cancelled.get())throw InterruptedException("Field render cancelled")
-        status("Decoding the saved WAV samples and verifying the entire architecture…")
-        val verified=MorphicFieldV3.verify(output)
-        require(verified.blueprint==blueprint && verified.profile==profile &&
-            verified.sha256==result.sha256 && verified.architecture==result.architecture){
-            "The encoded field plan could not be verified"
-        }
-        if(cancelled.get())throw InterruptedException("Field render cancelled before export")
-        status("Exporting verified WAV to Downloads/SubGen…")
-        val uri=WavIO.saveToDownloads(this,output,name)
-        // File-level fingerprint supplements packet-level verification. It
-        // identifies all PCM samples, including the residual ambient tail.
-        val fileDigest=java.security.MessageDigest.getInstance("SHA-256")
-        FileInputStream(output).buffered(65536).use { stream ->
-            val buffer=ByteArray(65536)
-            while(true){
-                val n=stream.read(buffer)
-                if(n<0)break
-                if(n>0)fileDigest.update(buffer,0,n)
+        try{
+            status("Generating the complete seven-node field and encoded WAV…")
+            val source=MorphicFieldV3.render(blueprint,minutes,profile,base,::status){cancelled.get()}
+            if(cancelled.get())throw InterruptedException("Morphic render cancelled")
+            status("Verifying all encoded cycles in the original field audio…")
+            val originalVerified=MorphicFieldV3.verify(base)
+            require(originalVerified.blueprint==blueprint &&
+                originalVerified.sha256==source.sha256 &&
+                originalVerified.architecture==source.architecture){
+                "Morphic source integrity check failed"
             }
+            val finalStage=if(needsMix){
+                status("Overlaying carrier and applying Morphic / Carrier / Master volumes…")
+                val stats=MorphicCarrierMixer.mix(base,carrier,mixed,gain,
+                    report={pct->
+                        if(pct%5==0)status("Mixing carrier over Morphic: "+pct+"%")
+                    },
+                    cancel={cancelled.get()})
+                require(stats.clippedFrames==0L){"Carrier mix clipped"}
+                mixed
+            }else base
+            if(cancelled.get())throw InterruptedException("Morphic carrier mix cancelled")
+            status("Verifying the complete FINAL mixed WAV and its written field…")
+            val verified=if(needsMix)
+                MorphicFieldV3.verify(finalStage,gain,carrier)
+            else MorphicFieldV3.verify(finalStage)
+            require(verified.blueprint==blueprint && verified.profile==profile &&
+                verified.sha256==source.sha256 &&
+                verified.architecture==source.architecture &&
+                verified.completeCycles>=1){
+                "Final mixed WAV failed the encoded field integrity check"
+            }
+            if(cancelled.get())throw InterruptedException("Morphic carrier mix cancelled")
+            // Publish only after the final mixed PCM was actually decoded.
+            val backup=File(filesDir,"morphic-field-v34-previous.bak")
+            if(backup.exists())backup.delete()
+            if(output.exists()){
+                require(output.renameTo(backup)){"Cannot protect previous field WAV"}
+            }
+            if(!finalStage.renameTo(output)){
+                if(backup.exists())backup.renameTo(output)
+                error("Unable to publish verified carrier WAV")
+            }
+            backup.delete()
+            val fileDigest=java.security.MessageDigest.getInstance("SHA-256")
+            FileInputStream(output).buffered(65536).use{stream->
+                val buffer=ByteArray(65536)
+                while(true){
+                    val count=stream.read(buffer)
+                    if(count<0)break
+                    if(count>0)fileDigest.update(buffer,0,count)
+                }
+            }
+            val wavFingerprint=fileDigest.digest().joinToString(""){"%02x".format(it)}
+            status("Exporting the verified carrier-over-Morphic WAV to Downloads/SubGen…")
+            val uri=WavIO.saveToDownloads(this,output,name)
+            live.edit()
+                .putString("morphicLastUri",uri.toString())
+                .putString("morphicLastHash",verified.sha256)
+                .putString("morphicLastFileHash",wavFingerprint)
+                .putString("morphicLastArchitecture",verified.architecture)
+                .putString("morphicLastProfile",profile.label)
+                .putString("morphicLastCarrierPath",carrier?.absolutePath?:"")
+                .putInt("morphicLastCarrierVolume",gain.carrier)
+                .putInt("morphicLastMorphicVolume",gain.morphic)
+                .putInt("morphicLastMasterVolume",gain.master)
+                .putLong("morphicLastCycles",verified.completeCycles).apply()
+            status("SAVED · MORPHIC CARRIER V3.4 · "+
+                "Field "+gain.morphic+"% · Carrier "+
+                (if(carrier!=null)gain.carrier else 0)+"% · Master "+gain.master+
+                "% · "+verified.completeCycles+" verified cycles")
+        }finally{
+            base.delete()
+            mixed.delete()
         }
-        val wavFingerprint=fileDigest.digest().joinToString(""){"%02x".format(it)}
-        live.edit().putString("morphicLastFileHash",wavFingerprint)
-            .putString("morphicLastUri",uri.toString())
-            .putString("morphicLastHash",verified.sha256)
-            .putString("morphicLastArchitecture",verified.architecture)
-            .putString("morphicLastProfile",profile.label)
-            .putLong("morphicLastCycles",verified.completeCycles).apply()
-        status("SAVED · ADAPTIVE FIELD V3.3 · "+profile.label.uppercase()+
-            " WAV · verified · "+verified.completeCycles+" complete cycles")
     }
     private fun runSubliminal(){
         Diagnostics.stage("SUBLIMINAL_PREPARE")
