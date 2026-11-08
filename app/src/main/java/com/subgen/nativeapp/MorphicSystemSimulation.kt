@@ -92,6 +92,15 @@ object MorphicSystemSimulation {
         val low=File(folder,"reduced-level.wav")
         val tampered=File(folder,"tampered.wav")
         try{
+            check("Device storage and isolated simulation workspace"){
+                require(cacheDir.isDirectory && cacheDir.canWrite()){"Cache directory is not writable"}
+                val available=cacheDir.usableSpace
+                require(available>=160L*1024*1024){
+                    "At least 160 MB free is required for isolated full WAV simulation"
+                }
+                "Writable app-private cache · "+
+                    (available/(1024*1024))+" MB free · user recordings untouched"
+            }
             check("Offline affirmation interpretation and original text"){
                 val analysis=AdaptiveFieldComposer.compose(text)
                 require(analysis.observedLines==3&&analysis.coverage>=3)
