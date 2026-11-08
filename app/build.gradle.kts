@@ -9,11 +9,11 @@ android {
         targetSdk = 34
         manifestPlaceholders["appLabel"] = "SubGen Four Blocks Preview"
         versionCode = 22
-        versionName = "3.2.9-field-intelligence"
+        versionName = "3.3.0-morphic-carrier"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     buildTypes {
-        debug { applicationIdSuffix = ".fieldintelligencev33"; versionNameSuffix = "-fieldintelligencev33"; manifestPlaceholders["appLabel"] = "SubGen FIELD INTELLIGENCE V3.3" }
+        debug { applicationIdSuffix = ".morphiccarrierv34"; versionNameSuffix = "-morphiccarrierv34"; manifestPlaceholders["appLabel"] = "SubGen MORPHIC CARRIER V3.4" }
         release { isMinifyEnabled = false }
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
