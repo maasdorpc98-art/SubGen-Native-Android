@@ -9,11 +9,11 @@ android {
         targetSdk = 34
         manifestPlaceholders["appLabel"] = "SubGen Four Blocks Preview"
         versionCode = 22
-        versionName = "3.3.0-morphic-carrier"
+        versionName = "3.3.1-deep-audit"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
     buildTypes {
-        debug { applicationIdSuffix = ".morphiccarrierv34"; versionNameSuffix = "-morphiccarrierv34"; manifestPlaceholders["appLabel"] = "SubGen MORPHIC CARRIER V3.4" }
+        debug { applicationIdSuffix = ".morphicauditv35"; versionNameSuffix = "-morphicauditv35"; manifestPlaceholders["appLabel"] = "SubGen MORPHIC AUDIT V3.5" }
         release { isMinifyEnabled = false }
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
