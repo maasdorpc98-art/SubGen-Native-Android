@@ -575,11 +575,11 @@ class MainActivity : Activity() {
     /** Fourth audio section: a self-contained written-intention waveform experiment. */
     private fun buildMorphic(){
         val intro=panel(body,fill=Color.rgb(24,18,27),border=Color.rgb(130,36,54),padding=18)
-        txt(intro,"SUBGEN · INTELLIGENT FIELD BUILDER V3.3",20f,coral,true,tracking=.08f,gravity=Gravity.CENTER)
+        txt(intro,"SUBGEN · FIELD INTELLIGENCE V3.4",20f,coral,true,tracking=.08f,gravity=Gravity.CENTER)
         txt(intro,"AFFIRMATIONS → OBJECTIVE → INSTRUCTIONS → FIELD AUDIO",10f,cool,gravity=Gravity.CENTER)
         space(intro,8)
         txt(intro,"Paste your affirmations. The offline analyzer generates an editable field objective, operating instructions and seven-node architecture before rendering a verified WAV.",11f,bright)
-        txt(intro,"Version 3.3 · Source-grounded adaptive analysis · Four original SubGen sections retained.",10f,cool)
+        txt(intro,"Version 3.4 · Import your own carrier · Separate volume controls · Four original sections retained.",10f,cool)
 
         fun field(parent:LinearLayout,title:String,key:String,hint:String,height:Int,single:Boolean=false):EditText{
             txt(parent,title.uppercase(),10f,cool,monoFont=true)
@@ -727,21 +727,90 @@ class MainActivity : Activity() {
                         append(edge.from.title).append(" → ").append(edge.to.title).append("\n")
                     }
                 }
-                AlertDialog.Builder(this).setTitle("FIELD ARCHITECTURE · V3.3")
+                AlertDialog.Builder(this).setTitle("FIELD ARCHITECTURE · V3.4")
                     .setMessage(summary).setPositiveButton("CLOSE",null).show()
             }.onFailure{Toast.makeText(this,it.message,Toast.LENGTH_LONG).show()}
         }
 
-        val settings=section(body,"04 — Sound and Length")
+        val settings=section(body,"04 — Sound, Carrier and Volume")
         txt(settings,"AUDIO PROFILE",10f,cool,monoFont=true)
+        val carrierPath=p.getString("morphicCarrierPath","").orEmpty()
+        val carrierAvailable=carrierPath.isNotBlank()&&File(carrierPath).isFile
+        val carrierEnabled=carrierAvailable&&p.getBoolean("morphicCarrierEnabled",true)
         val selectedProfile=p.getString("morphicProfile","ambient")?:"ambient"
         action(settings,(if(selectedProfile=="ambient")"● " else "○ ")+"AMBIENT · STEREO"){
             p.edit().putString("morphicProfile","ambient").apply();showTab("morphic")
         }
         action(settings,(if(selectedProfile=="signal")"● " else "○ ")+"SIGNAL · MONO"){
-            p.edit().putString("morphicProfile","signal").apply();showTab("morphic")
+            if(carrierEnabled)Toast.makeText(this,
+                "Carrier overlay requires Ambient Stereo. Disable carrier to use Mono.",
+                Toast.LENGTH_LONG).show()
+            else {p.edit().putString("morphicProfile","signal").apply();showTab("morphic")}
         }
-        txt(settings,"Stereo ambience combines gentle original tonal layers with the recoverable encoded field. Both formats are 24 kHz PCM WAV.",10f,cool)
+        txt(settings,"Ambient Stereo supports optional carrier audio. Original 24 kHz PCM encoding stays intact and is verified after mixing.",10f,cool)
+        space(settings,10)
+        txt(settings,"CARRIER OVER MORPHIC",11f,bright,true)
+        txt(settings,if(carrierAvailable)
+            "Selected: "+p.getString("morphicCarrierName","Imported carrier")+
+                " · "+(if(carrierEnabled)"ENABLED" else "DISABLED")
+            else "No carrier imported · original field audio only",11f,cool)
+        txt(settings,p.getString("morphicCarrierStatus",
+            "Import MP3, WAV, M4A or any audio supported by your device.")?:"",10f,cool)
+        action(settings,"IMPORT CARRIER AUDIO · MP3 / M4A / WAV"){
+            val picker=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type="audio/*"
+            }
+            @Suppress("DEPRECATION") startActivityForResult(picker,961)
+        }
+        if(carrierAvailable){
+            action(settings,if(carrierEnabled)"● CARRIER ENABLED · TAP TO DISABLE"
+                else "○ CARRIER DISABLED · TAP TO ENABLE"){
+                p.edit().putBoolean("morphicCarrierEnabled",!carrierEnabled)
+                    .putString("morphicProfile","ambient").apply()
+                showTab("morphic")
+            }
+            action(settings,"REMOVE CARRIER FROM THIS FIELD"){
+                p.edit().remove("morphicCarrierPath").remove("morphicCarrierName")
+                    .putBoolean("morphicCarrierEnabled",false)
+                    .putString("morphicCarrierStatus","Carrier removed from next render").apply()
+                showTab("morphic")
+            }
+        }
+        space(settings,10)
+        txt(settings,"INDEPENDENT MIX LEVELS",11f,bright,true)
+        fun volumeSlider(key:String,title:String,default:Int,min:Int){
+            val row=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
+            settings.addView(row,params().apply{topMargin=d(8)})
+            val current=p.getInt(key,default).coerceIn(min,100)
+            val label=txt(row,"$title · $current%",11f,bright)
+            val slider=SeekBar(this).apply{
+                max=100
+                progress=current
+                setPadding(d(6),0,d(6),0)
+                progressTintList=ColorStateList.valueOf(coral)
+                thumbTintList=ColorStateList.valueOf(coral)
+            }
+            row.addView(slider,params())
+            slider.setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener{
+                override fun onProgressChanged(bar:SeekBar?,value:Int,fromUser:Boolean){
+                    val safe=value.coerceIn(min,100)
+                    label.text="$title · $safe%"
+                    if(fromUser)p.edit().putInt(key,safe).apply()
+                }
+                override fun onStartTrackingTouch(bar:SeekBar?){}
+                override fun onStopTrackingTouch(bar:SeekBar?){
+                    val safe=(bar?.progress?:current).coerceIn(min,100)
+                    if(bar?.progress!=safe)bar?.progress=safe
+                    p.edit().putInt(key,safe).apply()
+                }
+            })
+        }
+        volumeSlider("morphicVolume", "MORPHIC SIGNAL",100,5)
+        volumeSlider("morphicCarrierVolume", "CARRIER AUDIO",65,0)
+        volumeSlider("morphicMasterVolume", "MASTER OUTPUT",80,5)
+        txt(settings,"Morphic 100% = full original encoded signal level. Carrier controls the imported audio. Master controls the final mix. Carrier loops to fill the field duration.",10f,cool)
+        txt(settings,"If high levels cause clipping or prevent final WAV verification, SubGen stops export and reports the problem.",10f,cool)
         val selected=p.getInt("morphicMinutes",5).coerceIn(1,60)
         txt(settings,"SELECTED DURATION · "+selected+" MINUTES",12f,bright,true)
         val timeRow=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
@@ -783,8 +852,8 @@ class MainActivity : Activity() {
         }
 
         val export=section(body,"05 — Generate and Verify Audio")
-        val name=field(export,"Output filename","morphicName","SubGen Auto Field V3.3",48,true)
-        if(name.text.isBlank())name.setText("SubGen Auto Field V3.3")
+        val name=field(export,"Output filename","morphicName","SubGen Carrier Field V3.4",48,true)
+        if(name.text.isBlank())name.setText("SubGen Carrier Field V3.4")
         fun render(autoPlan:Boolean,autoFit:Boolean){
             runCatching{
                 if(autoPlan || objective.text.isBlank() || instructions.text.isBlank() ||
@@ -814,7 +883,7 @@ class MainActivity : Activity() {
         action(export,"ONE-TAP · ANALYZE + AUTO-FIT + GENERATE","primary"){render(true,true)}
         action(export,"GENERATE USING REVIEWED FIELD INSTRUCTIONS"){render(false,false)}
         action(export,"STOP GENERATION"){startAction(RenderService.ACTION_CANCEL)}
-        morphicStatusText=txt(export,p.getString("morphic:status","Ready · field builder V3.3")?:"Ready",11f,green)
+        morphicStatusText=txt(export,p.getString("morphic:status","Ready · morphic carrier mixer V3.4")?:"Ready",11f,green)
         val hash=p.getString("morphicLastHash","").orEmpty()
         if(hash.isNotBlank()){
             txt(export,"LAST VERIFIED DATA SHA-256 · "+hash,9f,cool,monoFont=true)
@@ -825,7 +894,7 @@ class MainActivity : Activity() {
                 " · "+p.getLong("morphicLastCycles",0)+" complete data cycles",10f,cool)
             action(export,"▶ PLAY LAST VERIFIED FIELD WAV"){
                 runCatching{
-                    val file=File(filesDir,"morphic-field-architecture-v33-working.wav")
+                    val file=File(filesDir,"morphic-field-architecture-v34-working.wav")
                     require(file.isFile&&file.length()>44){"Generate a field WAV first"}
                     MediaPlayer().apply{
                         setDataSource(file.absolutePath)
@@ -836,7 +905,7 @@ class MainActivity : Activity() {
             }
         }
         action(export,"REFRESH VERIFIED FILE STATUS"){showTab("morphic")}
-        txt(export,"Digital verification checks the exact source, field plan, all complete encoding cycles, and the WAV container. Effects beyond the recording require independent evidence.",10f,cool)
+        txt(export,"The final carrier-mixed WAV is decoded using the selected carrier and gain settings to verify the complete field. This confirms digital integrity, not external effects.",10f,cool)
     }
 
     private fun buildNeuro(){
@@ -1478,6 +1547,33 @@ class MainActivity : Activity() {
         val uri=data?.data?:data?.clipData?.takeIf{it.itemCount==1}?.getItemAt(0)?.uri?:return
         runCatching{
             when(requestCode){
+                961->{
+                    val selectedUri=uri
+                    p.edit().putString("morphicCarrierStatus","Importing carrier audio…").apply()
+                    Thread({
+                        runCatching{
+                            val imported=MorphicCarrierImport.import(applicationContext,selectedUri)
+                            val name=runCatching{
+                                contentResolver.query(selectedUri,
+                                    arrayOf(OpenableColumns.DISPLAY_NAME),null,null,null)?.use{cursor->
+                                    if(cursor.moveToFirst())cursor.getString(0) else null
+                                }
+                            }.getOrNull()?:"Imported carrier audio"
+                            val meta=MorphicCarrierMixer.readHeader(imported)
+                            p.edit().putString("morphicCarrierPath",imported.absolutePath)
+                                .putString("morphicCarrierName",name)
+                                .putString("morphicCarrierStatus",
+                                    "READY · "+name+" · "+meta.rate+" Hz · "+
+                                        (if(meta.channels==2)"Stereo" else "Mono"))
+                                .putBoolean("morphicCarrierEnabled",true)
+                                .putString("morphicProfile","ambient").apply()
+                        }.onFailure{
+                            p.edit().putString("morphicCarrierStatus",
+                                "IMPORT FAILED · "+(it.message?:"Unsupported audio")).apply()
+                        }
+                        runOnUiThread{if(!isFinishing&&activeTab=="morphic")showTab("morphic")}
+                    },"morphic-carrier-import").start()
+                }
                 960->{
                     val text=contentResolver.openInputStream(uri)!!.bufferedReader().use{it.readText()}
                     require(text.toByteArray(Charsets.UTF_8).size<=16384){"Text exceeds 16 KB encoding limit"}
