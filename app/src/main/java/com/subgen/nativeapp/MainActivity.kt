@@ -801,7 +801,7 @@ class MainActivity : Activity() {
                 override fun onStartTrackingTouch(bar:SeekBar?){}
                 override fun onStopTrackingTouch(bar:SeekBar?){
                     val safe=(bar?.progress?:current).coerceIn(min,100)
-                    if(bar?.progress!=safe)bar?.progress=safe
+                    if(bar!=null && bar.progress!=safe)bar.progress=safe
                     p.edit().putInt(key,safe).apply()
                 }
             })
@@ -1552,7 +1552,7 @@ class MainActivity : Activity() {
                     p.edit().putString("morphicCarrierStatus","Importing carrier audio…").apply()
                     Thread({
                         runCatching{
-                            val imported=MorphicCarrierImport.import(applicationContext,selectedUri)
+                            val imported=MorphicCarrierImport.`import`(applicationContext,selectedUri)
                             val name=runCatching{
                                 contentResolver.query(selectedUri,
                                     arrayOf(OpenableColumns.DISPLAY_NAME),null,null,null)?.use{cursor->
