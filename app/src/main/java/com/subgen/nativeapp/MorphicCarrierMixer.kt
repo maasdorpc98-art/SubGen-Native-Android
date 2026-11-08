@@ -46,8 +46,12 @@ object MorphicCarrierMixer {
             val rate=u32(24).toInt()
             require(channels in 1..2 && rate in 8000..96000){"Carrier must be mono/stereo at 8–96 kHz"}
             val bytes=u32(40)
-            require(bytes>0 && bytes%(channels*2)==0L && bytes+44<=r.length()){
-                "Carrier WAV header has an invalid data length"
+            require(bytes>0 && bytes%(channels*2)==0L && bytes+44==r.length()){
+                "Carrier WAV header has an invalid data length or unexpected trailing content"
+            }
+            require(u32(4)==r.length()-8L &&
+                u16(32)==channels*2 && u32(28)==rate.toLong()*channels*2){
+                "Carrier WAV RIFF size or PCM alignment is invalid"
             }
             return Header(file,channels,rate,bytes/(channels*2))
         }
