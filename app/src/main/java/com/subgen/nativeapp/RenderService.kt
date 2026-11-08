@@ -191,7 +191,7 @@ class RenderService:Service() {
             ?:"SubGen Carrier Field V3.4"
         val base=File(filesDir,"morphic-field-v34-source.partial.wav")
         val mixed=File(filesDir,"morphic-field-v34-mixed.partial.wav")
-        val output=File(filesDir,"morphic-field-architecture-v34-working.wav")
+        val output=File(filesDir,"morphic-field-architecture-v35-working.wav")
         fun status(message:String){
             live.edit().putString("morphic:status",message).apply()
             update(message)
@@ -230,7 +230,7 @@ class RenderService:Service() {
             }
             if(cancelled.get())throw InterruptedException("Morphic carrier mix cancelled")
             // Publish only after the final mixed PCM was actually decoded.
-            val backup=File(filesDir,"morphic-field-v34-previous.bak")
+            val backup=File(filesDir,"morphic-field-v35-previous.bak")
             if(backup.exists())backup.delete()
             if(output.exists()){
                 require(output.renameTo(backup)){"Cannot protect previous field WAV"}
@@ -239,34 +239,44 @@ class RenderService:Service() {
                 if(backup.exists())backup.renameTo(output)
                 error("Unable to publish verified carrier WAV")
             }
-            backup.delete()
-            val fileDigest=java.security.MessageDigest.getInstance("SHA-256")
-            FileInputStream(output).buffered(65536).use{stream->
-                val buffer=ByteArray(65536)
-                while(true){
-                    val count=stream.read(buffer)
-                    if(count<0)break
-                    if(count>0)fileDigest.update(buffer,0,count)
+            try{
+                val fileDigest=java.security.MessageDigest.getInstance("SHA-256")
+                FileInputStream(output).buffered(65536).use{stream->
+                    val buffer=ByteArray(65536)
+                    while(true){
+                        val count=stream.read(buffer)
+                        if(count<0)break
+                        if(count>0)fileDigest.update(buffer,0,count)
+                    }
                 }
+                val wavFingerprint=fileDigest.digest().joinToString(""){"%02x".format(it)}
+                status("Exporting verified WAV to Downloads/SubGen…")
+                val uri=WavIO.saveToDownloads(this,output,name)
+                live.edit()
+                    .putString("morphicLastUri",uri.toString())
+                    .putString("morphicLastHash",verified.sha256)
+                    .putString("morphicLastFileHash",wavFingerprint)
+                    .putString("morphicLastArchitecture",verified.architecture)
+                    .putString("morphicLastProfile",profile.label)
+                    .putString("morphicLastCarrierPath",carrier?.absolutePath?:"")
+                    .putInt("morphicLastCarrierVolume",gain.carrier)
+                    .putInt("morphicLastMorphicVolume",gain.morphic)
+                    .putInt("morphicLastMasterVolume",gain.master)
+                    .putLong("morphicLastCycles",verified.completeCycles).apply()
+                backup.delete()
+                status("SAVED · AUDITED MORPHIC V3.5 · "+
+                    "Field "+gain.morphic+"% · Carrier "+
+                    (if(carrier!=null)gain.carrier else 0)+"% · Master "+gain.master+
+                    "% · "+verified.completeCycles+" verified cycles")
+            }catch(error:Throwable){
+                // A failed MediaStore export or hash must not destroy the
+                // user's previous verified playable field recording.
+                output.delete()
+                if(backup.exists())require(backup.renameTo(output)){
+                    "Export failed and previous WAV could not be restored: "+error.message
+                }
+                throw error
             }
-            val wavFingerprint=fileDigest.digest().joinToString(""){"%02x".format(it)}
-            status("Exporting the verified carrier-over-Morphic WAV to Downloads/SubGen…")
-            val uri=WavIO.saveToDownloads(this,output,name)
-            live.edit()
-                .putString("morphicLastUri",uri.toString())
-                .putString("morphicLastHash",verified.sha256)
-                .putString("morphicLastFileHash",wavFingerprint)
-                .putString("morphicLastArchitecture",verified.architecture)
-                .putString("morphicLastProfile",profile.label)
-                .putString("morphicLastCarrierPath",carrier?.absolutePath?:"")
-                .putInt("morphicLastCarrierVolume",gain.carrier)
-                .putInt("morphicLastMorphicVolume",gain.morphic)
-                .putInt("morphicLastMasterVolume",gain.master)
-                .putLong("morphicLastCycles",verified.completeCycles).apply()
-            status("SAVED · MORPHIC CARRIER V3.4 · "+
-                "Field "+gain.morphic+"% · Carrier "+
-                (if(carrier!=null)gain.carrier else 0)+"% · Master "+gain.master+
-                "% · "+verified.completeCycles+" verified cycles")
         }finally{
             base.delete()
             mixed.delete()
