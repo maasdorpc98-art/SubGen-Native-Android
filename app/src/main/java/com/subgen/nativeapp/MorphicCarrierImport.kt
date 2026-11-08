@@ -21,7 +21,7 @@ import kotlin.math.min
  */
 object MorphicCarrierImport {
     private const val MAX_DECODED=250L*1024L*1024L
-    fun import(context:Context,uri:Uri,stop:()->Boolean={false}):File{
+    fun `import`(context:Context,uri:Uri,stop:()->Boolean={false}):File{
         val name=runCatching{context.contentResolver.query(
             uri,arrayOf(OpenableColumns.DISPLAY_NAME),null,null,null)?.use{cursor->
             if(cursor.moveToFirst())cursor.getString(0) else null
