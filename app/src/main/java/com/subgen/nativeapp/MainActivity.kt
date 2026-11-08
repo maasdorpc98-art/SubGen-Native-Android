@@ -862,6 +862,10 @@ class MainActivity : Activity() {
         val name=field(export,"Output filename","morphicName","SubGen Carrier Field V3.5",48,true)
         if(name.text.isBlank())name.setText("SubGen Carrier Field V3.5")
         fun render(autoPlan:Boolean,autoFit:Boolean){
+            if(morphicSimulationRunning){
+                Toast.makeText(this,"A diagnostic simulation is running. Finish it before rendering.",Toast.LENGTH_LONG).show()
+                return
+            }
             runCatching{
                 if(autoPlan || objective.text.isBlank() || instructions.text.isBlank() ||
                     (p.getString("morphicPreparedText","")!=affirmations.text.toString() ||
