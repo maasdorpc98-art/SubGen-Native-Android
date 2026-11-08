@@ -246,8 +246,21 @@ object MorphicFieldV3 {
                       packet.size-HEADER_BYTES,hex(hash),dest,architecture)
     }
 
-    /** Decode the actual audio samples; a WAV with only a text metadata tag fails. */
-    fun verify(file:File):Result {
+    /**
+     * Recover the embedded blueprint from the actual PCM samples. For the
+     * optional carrier overlay we subtract exactly the user's selected carrier
+     * stream and applied volume gains before demodulating the packet. This
+     * catches problems caused by mixing and requires the retained carrier WAV
+     * to independently re-verify a mixed recording.
+     */
+    fun verify(
+        file:File,
+        overlay:MorphicCarrierMixer.Gain?=null,
+        carrier:File?=null
+    ):Result {
+        val carrierReader=if(overlay!=null && carrier!=null)
+            MorphicCarrierMixer.CarrierReader(carrier) else null
+        try{
         FileInputStream(file).buffered(65536).use { input ->
             val head=ByteArray(44)
             var filled=0
@@ -279,12 +292,20 @@ object MorphicFieldV3 {
                 for(bit in 7 downTo 0){
                     var zero=0.0; var one=0.0
                     for(i in 0 until BIT_FRAMES){
+                        carrierReader?.advance()
                         var mixed=0.0
                         for(ch in 0 until channels){
                             val lo=input.read();val hi=input.read()
                             require(lo>=0&&hi>=0){"Truncated audio packet"}
                             val sample=((hi shl 8) or lo).toShort().toInt().toDouble()/32767.0
-                            mixed+=sample-(if(channels==2)pad(frame,totalFrames,ch) else 0.0)
+                            val carrierValue=when(ch){
+                                0->carrierReader?.left?:0.0
+                                else->carrierReader?.right?:0.0
+                            }
+                            val carrierMix=carrierValue*(overlay?.carrierScale?:0.0)
+                            val morphicGain=overlay?.morphicScale?:1.0
+                            mixed+=sample-carrierMix-
+                                (if(channels==2)pad(frame,totalFrames,ch)*morphicGain else 0.0)
                         }
                         frame++
                         val core=mixed/channels
@@ -338,5 +359,6 @@ object MorphicFieldV3 {
             return Result(blueprint,profile,(totalFrames/RATE).toInt(),
                           totalFrames/totalPacketFrames,size.toInt(),hex(sha),file,architecture)
         }
+        }finally{carrierReader?.close()}
     }
 }
