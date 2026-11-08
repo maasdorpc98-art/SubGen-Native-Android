@@ -282,7 +282,11 @@ object MorphicFieldV3 {
             val frameBytes=channels*2
             val dataBytes=le32(40)
             require(dataBytes>0 && dataBytes%frameBytes==0L &&
-                dataBytes+44<=file.length()){"Truncated WAV audio"}
+                dataBytes+44==file.length()){"WAV length does not match PCM data: truncated or trailing content"}
+            require(le32(4)==file.length()-8L){"RIFF header size does not match the actual file"}
+            require(le16(32)==frameBytes && le32(28)==RATE.toLong()*frameBytes){
+                "WAV block align or byte rate is invalid"
+            }
             val totalFrames=dataBytes/frameBytes
             var frame=0L
             // Ambient is determined by channel count. Reconstruct the known
