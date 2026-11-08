@@ -1,0 +1,116 @@
+name: SubGen Morphic V3.5 - Deep Audit and Full Simulation
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/subgen-v35-deep-audit-simulation-20261108]
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout audited branch
+        uses: actions/checkout@v4
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Android SDK 35
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Preserve other three SubGen systems
+        run: |
+          python3 scripts/check-source.py
+          python3 scripts/check-studio-parity.py
+          python3 scripts/check-neuromodulation.py
+      - name: Audit complete Morphic execution and diagnostic wiring
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('app/src/main/java/com/subgen/nativeapp')
+          ui=(root/'MainActivity.kt').read_text()
+          morphic=ui[ui.index('    private fun buildMorphic(){'):ui.index('    private fun buildNeuro(){')]
+          required=[
+            'SYSTEM AUDITED V3.5','RUN FULL MORPHIC SYSTEM SIMULATION',
+            'VIEW LAST SIMULATION REPORT','morphicSimulationRunning',
+            '▶ PLAY / PAUSE VERIFIED FIELD WAV','■ STOP FIELD PLAYBACK',
+            'IMPORT CARRIER AUDIO','morphicCarrierVolume','morphicMasterVolume',
+            'morphicVolume','ONE-TAP · ANALYZE + AUTO-FIT + GENERATE',
+            'GENERATE USING REVIEWED FIELD INSTRUCTIONS',
+            'morphic-field-architecture-v35-working.wav'
+          ]
+          for phrase in required: assert phrase in morphic,phrase
+          service=(root/'RenderService.kt').read_text()
+          for phrase in ['MorphicCarrierMixer.mix(', 'MorphicFieldV3.verify(finalStage,gain,carrier)',
+                         'if(backup.exists())require(backup.renameTo(output))',
+                         'morphic-field-architecture-v35-working.wav']:
+              assert phrase in service,phrase
+          assert 'MorphicCarrierWav.normalize(downloaded,partial,stop)' in (root/'MorphicCarrierImport.kt').read_text()
+          assert 'morphic-carrier-' in (root/'MorphicCarrierImport.kt').read_text()
+          assert 'private var nextLeft=' in (root/'MorphicCarrierMixer.kt').read_text()
+          cfg=Path('app/build.gradle.kts').read_text()
+          assert '.morphicauditv35' in cfg
+          assert 'SubGen MORPHIC AUDIT V3.5' in cfg
+          assert 'versionCode = 22' in cfg
+          print('PASS: Four-section code preservation, V3.5 all controls and full rendering/error path wiring')
+          PY
+      - name: Execute 11-stage real audio simulation and five-format WAV error suite
+        run: |
+          K=app/src/main/java/com/subgen/nativeapp
+          kotlinc "$K/ScriptParser.kt" "$K/WordPacing.kt" "$K/WavIO.kt" \
+            "$K/MorphicFieldV2.kt" "$K/FieldDynamics.kt" "$K/FieldArchitecture.kt" \
+            "$K/MorphicFieldV3.kt" "$K/MorphicCarrierMixer.kt" "$K/MorphicCarrierWav.kt" \
+            "$K/MorphicSystemSimulation.kt" "$K/AutoFieldComposer.kt" "$K/AdaptiveFieldComposer.kt" \
+            scripts/test_morphic_v35_full_audit.kt tests/stubs/*.kt \
+            -include-runtime -d /tmp/subgen-v35-deep-audit.jar
+          java -Xmx4g -jar /tmp/subgen-v35-deep-audit.jar
+      - name: Original carrier volume WAV regression test
+        run: |
+          K=app/src/main/java/com/subgen/nativeapp
+          kotlinc "$K/ScriptParser.kt" "$K/WordPacing.kt" "$K/WavIO.kt" \
+            "$K/MorphicFieldV2.kt" "$K/FieldDynamics.kt" "$K/FieldArchitecture.kt" \
+            "$K/MorphicFieldV3.kt" "$K/MorphicCarrierMixer.kt" \
+            scripts/test_morphic_carrier_v34.kt tests/stubs/*.kt \
+            -include-runtime -d /tmp/subgen-v34-regressions.jar
+          java -Xmx4g -jar /tmp/subgen-v34-regressions.jar
+      - name: Source-grounded field analysis and V3.3 round-trip regression
+        run: |
+          K=app/src/main/java/com/subgen/nativeapp
+          kotlinc "$K/ScriptParser.kt" "$K/WordPacing.kt" "$K/WavIO.kt" \
+            "$K/MorphicFieldV2.kt" "$K/FieldDynamics.kt" "$K/FieldArchitecture.kt" \
+            "$K/MorphicFieldV3.kt" "$K/MorphicCarrierMixer.kt" \
+            "$K/AutoFieldComposer.kt" "$K/AdaptiveFieldComposer.kt" \
+            scripts/test_adaptive_field_v33.kt tests/stubs/*.kt \
+            -include-runtime -d /tmp/subgen-v33-audit.jar
+          java -Xmx4g -jar /tmp/subgen-v33-audit.jar
+      - name: Prepare original arm64 native audio runtimes
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y bzip2 file
+          bash scripts/prepare-native-runtime.sh
+          bash scripts/check-runtime.sh
+      - name: Compile full Android APK
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
+      - name: Verify signed full Android APK and package identity
+        run: |
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep "package: name='com.subgen.nativeapp.fourblocks.preview.morphicauditv35'"
+          unzip -l "$APK" | grep -q 'lib/arm64-v8a/libsherpa-onnx-jni.so'
+          sha256sum "$APK"
+      - name: Upload V3.5 fully audited signed APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SubGen-Morphic-Full-Audit-Simulation-V35-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
