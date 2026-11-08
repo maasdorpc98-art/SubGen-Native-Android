@@ -79,12 +79,14 @@ object MorphicCarrierMixer {
         private var right1=0.0
         var left=0.0;private set
         var right=0.0;private set
+        private var nextLeft=0.0
+        private var nextRight=0.0
         init {
             resetStream()
-            val a=readFrame()
-            val b=readFrame()
-            left0=a.first;right0=a.second
-            left1=b.first;right1=b.second
+            readFrame()
+            left0=nextLeft;right0=nextRight
+            readFrame()
+            left1=nextLeft;right1=nextRight
         }
         private fun resetStream(){
             stream.close()
@@ -97,17 +99,18 @@ object MorphicCarrierMixer {
             }
             readFrames=0
         }
-        private fun readFrame():Pair<Double,Double>{
+        private fun readFrame(){
             if(readFrames>=meta.frames)resetStream()
             readFully(stream,buffer)
             readFrames++
-            fun value(index:Int):Double {
-                val lo=buffer[index].toInt() and 255
-                val hi=buffer[index+1].toInt() and 255
-                return (((hi shl 8) or lo).toShort().toInt())/32768.0
-            }
-            val l=value(0)
-            return l to (if(meta.channels==2)value(2) else l)
+            val lo0=buffer[0].toInt() and 255
+            val hi0=buffer[1].toInt() and 255
+            nextLeft=(((hi0 shl 8) or lo0).toShort().toInt())/32768.0
+            if(meta.channels==2){
+                val lo1=buffer[2].toInt() and 255
+                val hi1=buffer[3].toInt() and 255
+                nextRight=(((hi1 shl 8) or lo1).toShort().toInt())/32768.0
+            }else nextRight=nextLeft
         }
         fun advance(){
             left=left0+(left1-left0)*fraction
@@ -116,8 +119,8 @@ object MorphicCarrierMixer {
             while(fraction>=1.0){
                 fraction-=1.0
                 left0=left1;right0=right1
-                val sample=readFrame()
-                left1=sample.first;right1=sample.second
+                readFrame()
+                left1=nextLeft;right1=nextRight
             }
         }
         override fun close(){stream.close()}
