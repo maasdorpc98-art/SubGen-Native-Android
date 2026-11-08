@@ -64,6 +64,8 @@ class MainActivity : Activity() {
     private var morphicStatusText:TextView?=null
     private var neuroStatusText:TextView?=null
     private var neuroPlayer:MediaPlayer?=null
+    private var morphicPlayer:MediaPlayer?=null
+    @Volatile private var morphicSimulationRunning=false
     private var neuroOutputVisible=false
     private var neuroLastRefreshToken=""
     private lateinit var status:TextView
@@ -139,7 +141,12 @@ class MainActivity : Activity() {
     }
     override fun onResume(){super.onResume();Diagnostics.setForeground(true)}
     override fun onPause(){Diagnostics.setForeground(false);super.onPause()}
-    override fun onDestroy(){handler.removeCallbacksAndMessages(null);neuroPlayer?.release();neuroPlayer=null;super.onDestroy()}
+    override fun onDestroy(){
+        handler.removeCallbacksAndMessages(null)
+        neuroPlayer?.release();neuroPlayer=null
+        runCatching{morphicPlayer?.release()};morphicPlayer=null
+        super.onDestroy()
+    }
     override fun onSaveInstanceState(outState:Bundle){outState.putString("tab",activeTab);super.onSaveInstanceState(outState)}
     private inner class GridBackdrop:android.graphics.drawable.Drawable(){
         private val paint=Paint().apply{color=Color.argb(5,255,59,59);strokeWidth=d(1).toFloat()}
@@ -575,11 +582,11 @@ class MainActivity : Activity() {
     /** Fourth audio section: a self-contained written-intention waveform experiment. */
     private fun buildMorphic(){
         val intro=panel(body,fill=Color.rgb(24,18,27),border=Color.rgb(130,36,54),padding=18)
-        txt(intro,"SUBGEN · FIELD INTELLIGENCE V3.4",20f,coral,true,tracking=.08f,gravity=Gravity.CENTER)
+        txt(intro,"SUBGEN · SYSTEM AUDITED V3.5",20f,coral,true,tracking=.08f,gravity=Gravity.CENTER)
         txt(intro,"AFFIRMATIONS → OBJECTIVE → INSTRUCTIONS → FIELD AUDIO",10f,cool,gravity=Gravity.CENTER)
         space(intro,8)
         txt(intro,"Paste your affirmations. The offline analyzer generates an editable field objective, operating instructions and seven-node architecture before rendering a verified WAV.",11f,bright)
-        txt(intro,"Version 3.4 · Import your own carrier · Separate volume controls · Four original sections retained.",10f,cool)
+        txt(intro,"Version 3.5 · Carrier, volume, verified audio and full device simulation · Four original sections retained.",10f,cool)
 
         fun field(parent:LinearLayout,title:String,key:String,hint:String,height:Int,single:Boolean=false):EditText{
             txt(parent,title.uppercase(),10f,cool,monoFont=true)
@@ -727,7 +734,7 @@ class MainActivity : Activity() {
                         append(edge.from.title).append(" → ").append(edge.to.title).append("\n")
                     }
                 }
-                AlertDialog.Builder(this).setTitle("FIELD ARCHITECTURE · V3.4")
+                AlertDialog.Builder(this).setTitle("FIELD ARCHITECTURE · V3.5")
                     .setMessage(summary).setPositiveButton("CLOSE",null).show()
             }.onFailure{Toast.makeText(this,it.message,Toast.LENGTH_LONG).show()}
         }
@@ -851,9 +858,9 @@ class MainActivity : Activity() {
             }.onFailure{Toast.makeText(this,it.message,Toast.LENGTH_LONG).show()}
         }
 
-        val export=section(body,"05 — Generate and Verify Audio")
-        val name=field(export,"Output filename","morphicName","SubGen Carrier Field V3.4",48,true)
-        if(name.text.isBlank())name.setText("SubGen Carrier Field V3.4")
+        val export=section(body,"05 — Generate, Verify and Test")
+        val name=field(export,"Output filename","morphicName","SubGen Carrier Field V3.5",48,true)
+        if(name.text.isBlank())name.setText("SubGen Carrier Field V3.5")
         fun render(autoPlan:Boolean,autoFit:Boolean){
             runCatching{
                 if(autoPlan || objective.text.isBlank() || instructions.text.isBlank() ||
@@ -883,7 +890,7 @@ class MainActivity : Activity() {
         action(export,"ONE-TAP · ANALYZE + AUTO-FIT + GENERATE","primary"){render(true,true)}
         action(export,"GENERATE USING REVIEWED FIELD INSTRUCTIONS"){render(false,false)}
         action(export,"STOP GENERATION"){startAction(RenderService.ACTION_CANCEL)}
-        morphicStatusText=txt(export,p.getString("morphic:status","Ready · morphic carrier mixer V3.4")?:"Ready",11f,green)
+        morphicStatusText=txt(export,p.getString("morphic:status","Ready · tested field creator V3.5")?:"Ready",11f,green)
         val hash=p.getString("morphicLastHash","").orEmpty()
         if(hash.isNotBlank()){
             txt(export,"LAST VERIFIED DATA SHA-256 · "+hash,9f,cool,monoFont=true)
@@ -892,20 +899,75 @@ class MainActivity : Activity() {
                 txt(export,"COMPLETE WAV SHA-256 · "+waveHash,9f,cool,monoFont=true)
             txt(export,"LAST OUTPUT · "+p.getString("morphicLastProfile","")+
                 " · "+p.getLong("morphicLastCycles",0)+" complete data cycles",10f,cool)
-            action(export,"▶ PLAY LAST VERIFIED FIELD WAV"){
+            action(export,"▶ PLAY / PAUSE VERIFIED FIELD WAV"){
                 runCatching{
-                    val file=File(filesDir,"morphic-field-architecture-v34-working.wav")
-                    require(file.isFile&&file.length()>44){"Generate a field WAV first"}
-                    MediaPlayer().apply{
-                        setDataSource(file.absolutePath)
-                        setOnCompletionListener{it.release()}
-                        prepare();start()
+                    val player=morphicPlayer
+                    if(player!=null){
+                        if(player.isPlaying)player.pause() else player.start()
+                    }else{
+                        val file=File(filesDir,"morphic-field-architecture-v35-working.wav")
+                        require(file.isFile&&file.length()>44){"Generate a field WAV first"}
+                        val created=MediaPlayer()
+                        morphicPlayer=created
+                        created.setOnCompletionListener{finished->
+                            if(morphicPlayer===finished)morphicPlayer=null
+                            finished.release()
+                        }
+                        created.setOnErrorListener{failed,_,_->
+                            if(morphicPlayer===failed)morphicPlayer=null
+                            failed.release();true
+                        }
+                        created.setDataSource(file.absolutePath)
+                        created.prepare();created.start()
                     }
-                }.onFailure{Toast.makeText(this,it.message,Toast.LENGTH_LONG).show()}
+                }.onFailure{
+                    runCatching{morphicPlayer?.release()};morphicPlayer=null
+                    Toast.makeText(this,it.message,Toast.LENGTH_LONG).show()
+                }
+            }
+            action(export,"■ STOP FIELD PLAYBACK"){
+                runCatching{morphicPlayer?.release()}
+                morphicPlayer=null
             }
         }
+        action(export,"RUN FULL MORPHIC SYSTEM SIMULATION","primary"){
+            if(morphicSimulationRunning || StateStore.active(this)){
+                Toast.makeText(this,"Finish the current simulation or render first",
+                    Toast.LENGTH_LONG).show()
+            }else{
+                morphicSimulationRunning=true
+                p.edit().putString("morphicSimStatus","RUNNING · preparing diagnostics").apply()
+                Thread({
+                    val report=runCatching{
+                        MorphicSystemSimulation.run(cacheDir){stage->
+                            p.edit().putString("morphicSimStatus","RUNNING · "+stage).apply()
+                        }.text()
+                    }.getOrElse{"FAIL · Simulation exception: "+(it.message?:"unknown")}
+                    p.edit().putString("morphicSimStatus",
+                        if(report.contains("Failed: 0 · Skipped: 0"))"PASS" else "FAIL")
+                        .putString("morphicSimReport",report).apply()
+                    morphicSimulationRunning=false
+                    runOnUiThread{
+                        if(!isFinishing){
+                            if(activeTab=="morphic")showTab("morphic")
+                            AlertDialog.Builder(this).setTitle("MORPHIC SYSTEM SIMULATION · V3.5")
+                                .setMessage(report).setPositiveButton("CLOSE",null).show()
+                        }
+                    }
+                },"morphic-v35-full-simulation").start()
+            }
+        }
+        txt(export,"SYSTEM SIMULATION · "+(p.getString("morphicSimStatus",
+            "Not yet tested on this device")?:"Not yet tested"),10f,cool)
+        action(export,"VIEW LAST SIMULATION REPORT"){
+            val report=p.getString("morphicSimReport","").orEmpty()
+            if(report.isBlank())Toast.makeText(this,
+                "Run the system simulation first",Toast.LENGTH_LONG).show()
+            else AlertDialog.Builder(this).setTitle("LAST SYSTEM SIMULATION")
+                .setMessage(report).setPositiveButton("CLOSE",null).show()
+        }
         action(export,"REFRESH VERIFIED FILE STATUS"){showTab("morphic")}
-        txt(export,"The final carrier-mixed WAV is decoded using the selected carrier and gain settings to verify the complete field. This confirms digital integrity, not external effects.",10f,cool)
+        txt(export,"Final mixed WAV data are decoded and verified using the imported carrier and chosen volumes. Run the actual on-device simulation to exercise the full PCM pipeline; external real-world effects are not established.",10f,cool)
     }
 
     private fun buildNeuro(){
