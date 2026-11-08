@@ -27,13 +27,13 @@ object MorphicCarrierImport {
             if(cursor.moveToFirst())cursor.getString(0) else null
         }}.getOrNull() ?: "selected-audio"
         val partial=File(context.filesDir,"morphic-carrier-import.partial")
-        val final=File(context.filesDir,"morphic-carrier-selected.wav")
+        val downloaded=File(context.filesDir,"morphic-carrier-source.download")
         var complete=false
         try{
             if(name.endsWith(".wav",true) || isWav(context,uri)){
                 context.contentResolver.openInputStream(uri).use{incoming->
                     require(incoming!=null){"Unable to read carrier audio"}
-                    FileOutputStream(partial).buffered(65536).use{output->
+                    FileOutputStream(downloaded).buffered(65536).use{output->
                         val buffer=ByteArray(65536)
                         var written=0L
                         while(true){
@@ -47,14 +47,34 @@ object MorphicCarrierImport {
                         }
                     }
                 }
+                MorphicCarrierWav.normalize(downloaded,partial,stop)
             } else decode(context,uri,partial,stop)
             MorphicCarrierMixer.readHeader(partial)
             if(stop())throw InterruptedException("Carrier import cancelled")
-            if(final.exists())require(final.delete()){"Could not replace previous carrier"}
-            require(partial.renameTo(final)){"Unable to finish carrier import"}
+            // Immutable content-addressed filenames avoid a new import
+            // silently replacing a carrier used by an active render.
+            val digest=java.security.MessageDigest.getInstance("SHA-256")
+            partial.inputStream().buffered(65536).use{stream->
+                val data=ByteArray(65536)
+                while(true){
+                    if(stop())throw InterruptedException("Carrier import cancelled")
+                    val n=stream.read(data)
+                    if(n<0)break
+                    if(n>0)digest.update(data,0,n)
+                }
+            }
+            val identity=digest.digest().take(12).joinToString(""){"%02x".format(it)}
+            val final=File(context.filesDir,"morphic-carrier-"+identity+".wav")
+            if(final.isFile){
+                MorphicCarrierMixer.readHeader(final)
+                partial.delete()
+            }else require(partial.renameTo(final)){"Unable to finish carrier import"}
             complete=true
             return final
-        }finally{if(!complete)partial.delete()}
+        }finally{
+            downloaded.delete()
+            if(!complete)partial.delete()
+        }
     }
     private fun isWav(context:Context,uri:Uri):Boolean=runCatching{
         context.contentResolver.openInputStream(uri)?.use{stream->
