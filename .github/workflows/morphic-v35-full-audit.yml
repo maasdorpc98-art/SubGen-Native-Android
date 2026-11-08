@@ -92,11 +92,20 @@ jobs:
             scripts/test_adaptive_field_v33.kt tests/stubs/*.kt \
             -include-runtime -d /tmp/subgen-v33-audit.jar
           java -Xmx4g -jar /tmp/subgen-v33-audit.jar
-      - name: Prepare original arm64 native audio runtimes
+      - name: Restore pinned native libraries from successful V3.4 APK
+        uses: actions/download-artifact@v4
+        with:
+          name: SubGen-Morphic-Carrier-V34-Four-Sections-APK
+          run-id: 42460161021
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: /tmp/subgen-v34-runtime
+      - name: Independently verify and reuse the known-good ARM64 runtime
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y bzip2 file
-          bash scripts/prepare-native-runtime.sh
+          sudo apt-get install -y file
+          APK=$(find /tmp/subgen-v34-runtime -type f -name '*.apk' | head -n 1)
+          test -s "$APK"
+          mkdir -p app/src/main/jniLibs/arm64-v8a
+          unzip -jo "$APK" 'lib/arm64-v8a/*.so' -d app/src/main/jniLibs/arm64-v8a
           bash scripts/check-runtime.sh
       - name: Compile full Android APK
         run: gradle --no-daemon --stacktrace :app:assembleDebug
